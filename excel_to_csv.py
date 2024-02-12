@@ -2,7 +2,8 @@ import pandas as pd
 import numpy as np
 
 print("Reading excel file")
-df = pd.read_excel("data/preklady/excel/Bibliografie překladů - tabulka (s příklady) - řečtina.xlsx", index_col=0)
+read_excel_bib = "data/preklady/excel/Bibliografie překladů - tabulka (s příklady) - finština.xlsx"
+df = pd.read_excel(read_excel_bib, index_col=0)
 df = df.reset_index()  
 
 print(len(df))
@@ -23,5 +24,10 @@ for column in df.columns:
     
 print(len(df))
 
-    
-df.to_csv('data/preklady/Bibliografie_prekladu_gre.csv',  encoding='utf-8')
+if "finština" in read_excel_bib:
+    trl = "fin"
+if "řečtina" in read_excel_bib:
+    trl = "gre"    
+
+csv_bib = 'data/preklady/Bibliografie_prekladu_{trl}.csv'.format(trl = trl)
+df.to_csv(csv_bib,  encoding='utf-8')

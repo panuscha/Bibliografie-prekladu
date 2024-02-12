@@ -97,6 +97,20 @@ class Bibliografie_record_fin(Bibliografie_record):
         data = date_record_creation + letter + publication_date +  publication_country + material_specific + language + modified + cataloging_source
         record.add_ordered_field(Field(tag='008', indicators = [' ', ' '], data = data))
         return record
+    
+
+    def add_035(self, row, record ):
+        "Adds FENNICA catalogue number to 035$a"
+        finnish_id = row["Finské id"]
+        record.add_ordered_field(Field(tag='035', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "(FENNICA)[{fennica}]".format(fennica = finnish_id))]))
+        return record
+    
+    def add_998(self, row, record ):
+        "Adds Melinda hypertext to 998$a"
+        finnish_id = row["Finské id"]
+        record.add_ordered_field(Field(tag='998', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "https://melinda.kansalliskirjasto.fi/byid/{fennica}".format(fennica = finnish_id))]))
+        return record
+
         
        
     def add_245(self,row, liability, title, subtitle, author, translators,  record):
@@ -130,7 +144,7 @@ class Bibliografie_record_fin(Bibliografie_record):
     def add_common_specific(self, row, record, author, translators):
         " 001, 035, 240, title, subtitle, liability -> 245"
         record.add_ordered_field(Field(tag='001', indicators = [' ', ' '], data=str('fi24'+ "".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(row['Číslo záznamu'])))) 
-        record.add_ordered_field(Field(tag='035', indicators = [' ', ' '], subfields = [Subfield(code = 'a', value = 'FENNICA')])) 
+        record = self.add_035(row, record)
         
         if not(pd.isnull(row['Původní název'])) and not (("originál neznámý" in str(row['Původní název']).lower())  or ("originál neexistuje" in str(row['Původní název']).lower())):
             original_title = row['Původní název'].strip()                                                                       
@@ -140,6 +154,7 @@ class Bibliografie_record_fin(Bibliografie_record):
         (title, subtitle) = self.get_title_subtitle(str(row['Název díla dle titulu v latince']))
         liabiliy = row['Údaje o odpovědnosti a další informace (z titulní strany)']
         record = self.add_245(row, liabiliy, title, subtitle, author, translators,record) 
+        record = self.add_998(row, record)
         return record 
      
     def add_994_book(self, row, df, record):
@@ -158,8 +173,8 @@ class Bibliografie_record_fin(Bibliografie_record):
     def add_994_part_of_book(self, row, record):
         """Adds id of the collective work to field 994."""
         is_part_of = str(int(row['Je součást čeho (číslo záznamu)']))
-        number = "it22"+"".join(['0' for a in range(6-len(is_part_of))]) + is_part_of
-        record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'DN'),
+        number = "fi22"+"".join(['0' for a in range(6-len(is_part_of))]) + is_part_of
+        record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'UP'),
                                                                                                 Subfield(code = 'b',value = number)]))
         return record
     
@@ -244,7 +259,7 @@ class Bibliografie_record_fin(Bibliografie_record):
 if __name__ == "__main__":
     
         # file with all czech translations and their id's 
-    czech_translations="D:/Panuskova/Nextcloud/Bibliografie prekladu/data/czech_translations_full_18_01_2022.mrc"
+    czech_translations="data/czech_translations_full_18_01_2022.mrc"
     # list of identifiers
     identifiers = []
     # dictionary with author - work:id pairs
@@ -271,14 +286,14 @@ if __name__ == "__main__":
                             else:
                                 dict_author_work[author.lower()] = {work.lower() : id }
     # initial table 
-    IN = 'D:/Panuskova/Nextcloud/Bibliografie prekladu/data/preklady/Bibliografie_prekladu_fin.csv'
+    IN = 'data/preklady/Bibliografie_prekladu_fin.csv'
     # final file
-    OUT = 'D:/Panuskova/Nextcloud/Bibliografie prekladu/data/marc_fin.mrc'
+    OUT = 'data/marc_fin.mrc'
 
     df = pd.read_csv(IN, encoding='utf_8')
 
     # table with authority codes
-    finalauthority_path = 'D:/Panuskova/Nextcloud/Bibliografie prekladu/data/finalauthority_simple.csv'
+    finalauthority_path = 'data/finalauthority_simple.csv'
     finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
     finalauthority.index= finalauthority['nkc_id']
         # writes data to file in variable OUT
