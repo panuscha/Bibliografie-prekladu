@@ -10,19 +10,24 @@ df = pd.read_csv(df_path, encoding='utf_8')
 
 fennica_id = df['Finské id']
 fennica_id = [str(id) for id in fennica_id] 
-print(fennica_id)
+fennica_id = set(fennica_id)
+fennica_id.remove('nan')
+#print(fennica_id)
 
 writer = MARCWriter(open(OUT, "wb"))
 
 def do_it(r):
-    global writer
+    global writer, fennica_id
     for field in r.get_fields('001'):
         if str(field.data) in fennica_id:
             writer.write(r)
-            print(r)
-            
+            #print(r)
+            fennica_id.remove(field.data)
+
+
 try:
     map_xml(do_it, path)
+    print("Not found: ", fennica_id)
 except Exception as error:
     print("Exception: " + type(error).__name__)      
 finally:

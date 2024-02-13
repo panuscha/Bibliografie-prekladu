@@ -6,6 +6,7 @@ from pymarc.field import Field
 from datetime import datetime
 import re
 import random
+import pickle
 
 class Bibliografie_record_fin(Bibliografie_record): 
     
@@ -13,6 +14,7 @@ class Bibliografie_record_fin(Bibliografie_record):
         self.finalauthority = finalauthority
         self.dict_author_work = dict_author_work
         self.identifiers = identifiers 
+        self.df_fennica = pickle.load( open( "data/fennica_czech.obj", "rb" ) )
         
     def get_translators_and_other_roles(self, other_roles, record):
         # Regex pattern to match text between parentheses  
@@ -119,6 +121,7 @@ class Bibliografie_record_fin(Bibliografie_record):
         """
                 # matches first word in string
         skip = '0'
+        c = ''
         if not pd.isnull(row['Údaje o odpovědnosti a další informace (z titulní strany)']):
             c = row['Údaje o odpovědnosti a další informace (z titulní strany)']      # Údaje o odpovědnosti a další informace
         title = title.strip()      
