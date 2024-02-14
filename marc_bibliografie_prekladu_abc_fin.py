@@ -10,11 +10,12 @@ import pickle
 
 class Bibliografie_record_fin(Bibliografie_record): 
     
-    def __init__(self, finalauthority, dict_author_work, identifiers):
+    def __init__(self, finalauthority, dict_author_work, identifiers, fennica, clb_trl):
         self.finalauthority = finalauthority
         self.dict_author_work = dict_author_work
         self.identifiers = identifiers 
-        self.df_fennica = pickle.load( open( "data/fennica_czech.obj", "rb" ) )
+        self.df_fennica = pickle.load(open(fennica, "rb" ))
+        self.clb_trl = pickle.load(open(clb_trl, "rb" ))
         
     def get_translators_and_other_roles(self, other_roles, record):
         # Regex pattern to match text between parentheses  
@@ -299,18 +300,26 @@ if __name__ == "__main__":
     finalauthority_path = 'data/finalauthority_simple.csv'
     finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
     finalauthority.index= finalauthority['nkc_id']
+
+
         # writes data to file in variable OUT
     with open(OUT , 'wb') as writer:
         #iterates all rows in the table
         for index, row in df.iterrows():
             print(row['Číslo záznamu'])
-            bib_ita = Bibliografie_record_fin(finalauthority = finalauthority, dict_author_work= dict_author_work, identifiers=identifiers)
-            if 'kniha' in row['Typ záznamu']: 
-                record = bib_ita.create_record_book(row, df)
-            if 'část knihy' in row['Typ záznamu']: 
-                record = bib_ita.create_record_part_of_book(row, df)
-            if 'článek v časopise' in row['Typ záznamu']:
-                record = bib_ita.create_article(row)
-            print(record)    
-            writer.write(record.as_marc())
+            bib_fin = Bibliografie_record_fin(finalauthority = finalauthority, dict_author_work= dict_author_work, identifiers=identifiers, 
+                                              fennica="data/fennica_czech.obj", clb_trl="data/clb_trl_fin.obj")
+            title = row['Název díla dle titulu v latince']
+            (author_name,author_code), _  = bib_fin.add_author_code(row['Autor/ka + kód autority'], Record(to_unicode=True,
+                                                    force_utf8=True))
+
+            if not (any(title == i for i in bib_fin.clb_trl['title_trl']) or any(author_code == i for i in bib_fin.clb_trl['author_code'])):
+                if 'kniha' in row['Typ záznamu']: 
+                    record = bib_fin.create_record_book(row, df)
+                if 'část knihy' in row['Typ záznamu']: 
+                    record = bib_fin.create_record_part_of_book(row, df)
+                if 'článek v časopise' in row['Typ záznamu']:
+                    record = bib_fin.create_article(row)
+                print(record)    
+                writer.write(record.as_marc())
     writer.close()

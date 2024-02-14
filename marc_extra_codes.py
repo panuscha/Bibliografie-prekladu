@@ -73,13 +73,16 @@ def import_bib_translations(path, lang):
                 'title_trl': [],
                'author_name':[],
                'author_code':[],
-               'finished':[]}
+               'finished':[],
+               'pub_year':[]}
     with open(path, 'rb') as data, open("data/clb_trl_{lang}.mrc".format(lang =lang) , 'wb') as writer:
         reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
         for record in reader:    
             if record['041']['a'] == lang: 
                 writer.write(record.as_marc())
                 df_dict['001'].append(str(record['001'].data))
+
+                df_dict['pub_year'].append(str(record['008'].data[7:11]))
                 
                 tags = ['author_name', 'author_code', 'title_trl', 'finished']
                 for field in record.get_fields('100'):
