@@ -302,6 +302,10 @@ if __name__ == "__main__":
     finalauthority.index= finalauthority['nkc_id']
 
 
+    duplications_finished = []
+    duplications_unfinished = []
+    dup_count_fin = 0
+    dup_count_unfin = 0
         # writes data to file in variable OUT
     with open(OUT , 'wb') as writer:
         #iterates all rows in the table
@@ -312,8 +316,10 @@ if __name__ == "__main__":
             title = row['Název díla dle titulu v latince']
             (author_name,author_code), _  = bib_fin.add_author_code(row['Autor/ka + kód autority'], Record(to_unicode=True,
                                                     force_utf8=True))
-
-            if not (any(title == i for i in bib_fin.clb_trl['title_trl']) or any(author_code == i for i in bib_fin.clb_trl['author_code'])):
+            
+            
+            df_dup_record = bib_fin.clb_trl[(bib_fin.clb_trl['title_trl'] == title) & (bib_fin.clb_trl['author_code'] == author_code)]
+            if df_dup_record.empty:
                 if 'kniha' in row['Typ záznamu']: 
                     record = bib_fin.create_record_book(row, df)
                 if 'část knihy' in row['Typ záznamu']: 
@@ -322,4 +328,16 @@ if __name__ == "__main__":
                     record = bib_fin.create_article(row)
                 print(record)    
                 writer.write(record.as_marc())
+            else: 
+                matching_row = df_dup_record.iloc[0]
+                if matching_row['finished']:
+                    duplications_finished.append({author_name:title})
+                    dup_count_fin += 1
+                else:
+                    duplications_unfinished.append({author_name:title})
+                    dup_count_unfin += 1    
+    print(dup_count_fin)
+    print( duplications_finished)  
+    print(dup_count_unfin)
+    print(duplications_unfinished)                
     writer.close()
