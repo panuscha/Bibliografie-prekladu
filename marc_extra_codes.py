@@ -2,8 +2,7 @@ import pymarc
 from pymarc import Record, MARCReader, Subfield
 import pandas as pd
 import pickle
-
-
+import numpy as np
 
 def import_czech_fennica(path):
     "Reads czech FENNICA marc records and saves them as DataFrame"
@@ -37,7 +36,7 @@ def import_czech_fennica(path):
     print(counter)
     return df_dict
 
-def create_dict_work(path):
+def create_dict_author_work(path, tag):
     "Creates dictionary with authors - title:id pairs"
     # list of identifiers
     identifiers = []
@@ -48,11 +47,11 @@ def create_dict_work(path):
         for record in reader:
             if not record is None:
                 for field in  record.get_fields('595') : 
-                    if all([ x in str(field)  for x in ['$1', '$a', '$t']  ]): # if '$1' in str(field) and '$a' in str(field) and '$t' in str(field):
+                    if all([ x in str(field)  for x in ['$1', '$t', '$'+tag]  ]): # if '$1' in str(field) and '$a' in str(field) and '$t' in str(field):
                         id = record['595']['1']
                         if not id in identifiers:
                             identifiers.append(id)
-                        author = record['595']['a']
+                        author = record['595'][tag]
                         author = author[0:len(author)-1]
                         work = record['595']['t']
                         if not work is None: 
@@ -63,7 +62,9 @@ def create_dict_work(path):
                             else:
                                 dict_author_work[author.lower()] = {work.lower() : id } 
 
-    return dict_author_work       
+    return dict_author_work    
+
+   
 
 def import_bib_translations(path, lang):
     "Reads CLB translations marc records and saves lang-records as DataFrame" 
@@ -82,7 +83,7 @@ def import_bib_translations(path, lang):
                 writer.write(record.as_marc())
                 df_dict['001'].append(str(record['001'].data))
 
-                df_dict['pub_year'].append(str(record['008'].data[7:11]))
+                df_dict['pub_year'].append(str(int(record['008'].data[7:11])))
                 
                 tags = ['author_name', 'author_code', 'title_trl', 'finished']
                 for field in record.get_fields('100'):
@@ -104,7 +105,36 @@ def import_bib_translations(path, lang):
 
                 count += 1
     print(count)
-    return df_dict            
+    return df_dict   
+
+def load_df_csv(path): 
+    df = pd.read_csv(path, encoding='utf_8')       
+    df["Číslo záznamu"] = df["Číslo záznamu"].apply(lambda x: int(x) if not(pd.isnull(x)) else np.nan)
+    df["Finské id"] = df["Finské id"].apply(lambda x: str(x) if not(pd.isnull(x)) else np.nan)
+    df['Typ záznamu'] = df['Typ záznamu'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Je součást čeho (číslo záznamu)'] = df['Je součást čeho (číslo záznamu)'].apply(lambda x: str(int(x)) if not(pd.isnull(x)) and x.isnumeric() else np.nan)
+    df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] = df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Vztah k originálu (překlad vs. adaptace)'] = df['Vztah k originálu (překlad vs. adaptace)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Druh adaptace (slovem)'] = df['Druh adaptace (slovem)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Autor/ka + kód autority'] = df['Autor/ka + kód autority'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Název díla dle titulu v latince'] = df['Název díla dle titulu v latince'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else np.nan) 
+    df['Údaje o odpovědnosti a další informace (z titulní strany)'] = df['Údaje o odpovědnosti a další informace (z titulní strany)'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else np.nan) 
+    df['Původní název'] = df['Původní název'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Jazyk díla'] = df['Jazyk díla'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Výchozí jazyk '] = df['Výchozí jazyk '].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan )
+    df['Zprostředkovací jazyk'] = df['Zprostředkovací jazyk'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Údaje o zprostředkovacím díle'] = df['Údaje o zprostředkovacím díle'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Město vydání, země vydání, nakladatel'] = df['Město vydání, země vydání, nakladatel'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df['Edice, svazek'] = df['Edice, svazek'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan )
+    df['Údaje o časopiseckém vydání'] = df['Údaje o časopiseckém vydání'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
+    df["Počet stran"] = df["Počet stran"].apply(lambda x: str(int(x)) if not(pd.isnull(x)) else np.nan)
+    df["Rok"] = df["Rok"].apply(lambda x: str(int(x)) if not(pd.isnull(x)) else np.NaN)
+    df['ISBN'] = df['ISBN'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan) 
+    df['Další role'] = df['Další role'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)   
+    df['Volná poznámka'] = df['Volná poznámka'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)  
+    df['technická poznámka'] = df['technická poznámka'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)  
+    return df
+
                               
 
 
@@ -112,8 +142,10 @@ if __name__ == "__main__":
     # df_dict = import_czech_fennica("data/fennica_preklady.mrc")
     # df = pd.DataFrame(df_dict).T
     # pickle.dump( df, open( "data/fennica_czech.obj", "wb" ) )
-    lang = 'fin'
-    df_dict = import_bib_translations("data/ucla_trl.mrc", lang)
-    df = pd.DataFrame(df_dict)
-    pickle.dump( df, open( "data/clb_trl_{lang}.obj".format(lang =lang), "wb" ) )
-    print(df)
+    # lang = 'fin'
+    # df_dict = import_bib_translations("data/ucla_trl.mrc", lang)
+    # df = pd.DataFrame(df_dict)
+    # pickle.dump( df, open( "data/clb_trl_{lang}.obj".format(lang =lang), "wb" ) )
+    # print(df)
+    dict_author_code_work = create_dict_author_work("data/czech_translations_full_18_01_2022.mrc", '7')
+    pickle.dump( dict_author_code_work, open( "data/dict_author_code_work.obj", "wb" ) )

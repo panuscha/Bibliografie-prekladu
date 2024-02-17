@@ -7,15 +7,15 @@ from datetime import datetime
 import re
 import random
 import pickle
+import marc_extra_codes
 
 class Bibliografie_record_fin(Bibliografie_record): 
     
-    def __init__(self, finalauthority, dict_author_work, identifiers, fennica, clb_trl):
-        self.finalauthority = finalauthority
-        self.dict_author_work = dict_author_work
-        self.identifiers = identifiers 
-        self.df_fennica = pickle.load(open(fennica, "rb" ))
-        self.clb_trl = pickle.load(open(clb_trl, "rb" ))
+    def __init__(self, finalauthority_path, dict_author_work, identifiers, fennica_path, clb_trl_path):
+        super(Bibliografie_record_fin, self).__init__(finalauthority_path, dict_author_work, identifiers)
+        self.tag = "fi24"
+        self.df_fennica = pickle.load(open(fennica_path, "rb" ))
+        self.clb_trl = pickle.load(open(clb_trl_path, "rb" ))
         
     def get_translators_and_other_roles(self, other_roles, record):
         # Regex pattern to match text between parentheses  
@@ -104,14 +104,16 @@ class Bibliografie_record_fin(Bibliografie_record):
 
     def add_035(self, row, record ):
         "Adds FENNICA catalogue number to 035$a"
-        finnish_id = row["Finské id"]
-        record.add_ordered_field(Field(tag='035', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "(FENNICA)[{fennica}]".format(fennica = finnish_id))]))
+        if not pd.isnull(row["Finské id"]):
+            finnish_id = row["Finské id"]
+            record.add_ordered_field(Field(tag='035', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "(FENNICA)[{fennica}]".format(fennica = finnish_id))]))
         return record
     
     def add_998(self, row, record ):
         "Adds Melinda hypertext to 998$a"
-        finnish_id = row["Finské id"]
-        record.add_ordered_field(Field(tag='998', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "https://melinda.kansalliskirjasto.fi/byid/{fennica}".format(fennica = finnish_id))]))
+        if not pd.isnull(row["Finské id"]):
+            finnish_id = row["Finské id"]
+            record.add_ordered_field(Field(tag='998', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "https://melinda.kansalliskirjasto.fi/byid/{fennica}".format(fennica = finnish_id))]))
         return record
 
         
@@ -147,7 +149,6 @@ class Bibliografie_record_fin(Bibliografie_record):
                 
     def add_common_specific(self, row, record, author, translators):
         " 001, 035, 240, title, subtitle, liability -> 245"
-        record.add_ordered_field(Field(tag='001', indicators = [' ', ' '], data=str('fi24'+ "".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(row['Číslo záznamu'])))) 
         record = self.add_035(row, record)
         
         if not(pd.isnull(row['Původní název'])) and not (("originál neznámý" in str(row['Původní název']).lower())  or ("originál neexistuje" in str(row['Původní název']).lower())):
@@ -161,26 +162,6 @@ class Bibliografie_record_fin(Bibliografie_record):
         record = self.add_998(row, record)
         return record 
      
-    def add_994_book(self, row, df, record):
-        """Adds id's of all parts of the collective work to field 994."""
-        cislo_zaznamu = row['Číslo záznamu']
-        is_part_of = df['Je součást čeho (číslo záznamu)']==cislo_zaznamu
-        if any(is_part_of):
-            book_rows = [i for i, val in enumerate(is_part_of) if val]
-            for i in book_rows:
-                r = df.iloc[i]
-                number = "fi24"+"".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(r['Číslo záznamu'])
-                record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'DN'),
-                                                                                                Subfield(code = 'b',value = number)] ))   
-        return record             
-    
-    def add_994_part_of_book(self, row, record):
-        """Adds id of the collective work to field 994."""
-        is_part_of = str(int(row['Je součást čeho (číslo záznamu)']))
-        number = "fi22"+"".join(['0' for a in range(6-len(is_part_of))]) + is_part_of
-        record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'UP'),
-                                                                                                Subfield(code = 'b',value = number)]))
-        return record
     
     def create_record_book(self,row, df):
         """Creates record for book.
@@ -202,7 +183,9 @@ class Bibliografie_record_fin(Bibliografie_record):
         record = self.add_common_specific(row, record, author, translators)    
         record = self.add_264(row, record)
         if row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] == 'souborné dílo':
-            self.add_994_book(row, df, record)     
+            self.add_994_book(row, df, record)   
+
+        self.mine_fennica(record, row)
         return record
     
     
@@ -214,9 +197,13 @@ class Bibliografie_record_fin(Bibliografie_record):
         record.leader = '-----naa---------4i-4500'  
         ind = int(row['Je součást čeho (číslo záznamu)'])
         book_row = df.loc[df['Číslo záznamu'] == ind]
+
+        # from Dataframe to Pandas Series
+        book_row = book_row.squeeze()
+
         # is the author same as in the collective work, or does the book has it's own author 
         if pd.isnull(row['Autor/ka + kód autority']):
-            tup, record = self.add_author_code(book_row['Autor/ka + kód autority'].values[0], record)
+            tup, record = self.add_author_code(book_row['Autor/ka + kód autority'], record)
             author = tup[0] 
             code = tup[1]
         else:
@@ -224,13 +211,12 @@ class Bibliografie_record_fin(Bibliografie_record):
             author = tup[0] 
             code = tup[1]    
             
-        if not pd.isnull(book_row['Další role'].values[0]):
-            translators, record = self.get_translators_and_other_roles(book_row['Další role'].values[0], record) 
+        if not pd.isnull(book_row['Další role'].values):
+            translators, record = self.get_translators_and_other_roles(book_row['Další role'], record) 
         else:
             translators = None  
             
-        # from Dataframe to Pandas Series
-        book_row = book_row.squeeze()
+        
         record = self.add_008(book_row, record)
         record = self.add_264(book_row, record)
         record = self.add_commmon(row, record, author, code, translators)
@@ -259,66 +245,64 @@ class Bibliografie_record_fin(Bibliografie_record):
         record = self.add_common_specific(row, record, author, translators) 
         record = self.add_773(record, row)
         return record 
+    
+    def mine_fennica(self,record, row):
+        if not pd.isnull(row["Finské id"]):
+            finnish_id = row["Finské id"]
+            fennica_info = self.df_fennica[self.df_fennica.index==finnish_id].squeeze()
 
+            ### 008
+            fennica_008 = fennica_info['008'][0]
+            clb_008 = list(record['008'].data)
+            for i in range(14, 38):
+                if fennica_008[i].isalnum() and not clb_008[i].isalnum():
+                    clb_008[i] = fennica_008[i]
+            record['008'].data = ''.join(clb_008)        
+            print(record)
 if __name__ == "__main__":
     
-        # file with all czech translations and their id's 
+    # file with all czech translations and their id's 
     czech_translations="data/czech_translations_full_18_01_2022.mrc"
     # list of identifiers
     identifiers = []
-    # dictionary with author - work:id pairs
-    dict_author_work = {}
 
-    # saves data from czech_translations file to dictionary dict_author_work  
-    with open(czech_translations, 'rb') as data:
-        reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
-        for record in reader:
-            if not record is None:
-                for field in  record.get_fields('595') : 
-                    if all([ x in str(field)  for x in ['$1', '$a', '$t']  ]): # if '$1' in str(field) and '$a' in str(field) and '$t' in str(field):
-                        id = record['595']['1']
-                        if not id in identifiers:
-                            identifiers.append(id)
-                        author = record['595']['a']
-                        author = author[0:len(author)-1]
-                        work = record['595']['t']
-                        if not work is None: 
-                            if work[-1] == '.':
-                                work = work[0:len(work)-1]
-                            if author.lower() in dict_author_work.keys():
-                                dict_author_work[author.lower()].update({work.lower() : id })  
-                            else:
-                                dict_author_work[author.lower()] = {work.lower() : id }
     # initial table 
     IN = 'data/preklady/Bibliografie_prekladu_fin.csv'
     # final file
     OUT = 'data/marc_fin.mrc'
 
-    df = pd.read_csv(IN, encoding='utf_8')
-
+    
+    df = marc_extra_codes.load_df_csv(IN)
     # table with authority codes
     finalauthority_path = 'data/finalauthority_simple.csv'
-    finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
-    finalauthority.index= finalauthority['nkc_id']
+
+
+    dict_author_work_path = "data/dict_author_work.obj"
 
 
     duplications_finished = []
     duplications_unfinished = []
     dup_count_fin = 0
     dup_count_unfin = 0
+
+    found_records = []
         # writes data to file in variable OUT
     with open(OUT , 'wb') as writer:
         #iterates all rows in the table
         for index, row in df.iterrows():
             print(row['Číslo záznamu'])
-            bib_fin = Bibliografie_record_fin(finalauthority = finalauthority, dict_author_work= dict_author_work, identifiers=identifiers, 
-                                              fennica="data/fennica_czech.obj", clb_trl="data/clb_trl_fin.obj")
+            bib_fin = Bibliografie_record_fin(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, identifiers=identifiers, 
+                                              fennica_path="data/fennica_czech.obj", clb_trl_path="data/clb_trl_fin.obj")
             title = row['Název díla dle titulu v latince']
             (author_name,author_code), _  = bib_fin.add_author_code(row['Autor/ka + kód autority'], Record(to_unicode=True,
                                                     force_utf8=True))
             
+            year = row['Rok']
+            print(year)
             
-            df_dup_record = bib_fin.clb_trl[(bib_fin.clb_trl['title_trl'] == title) & (bib_fin.clb_trl['author_code'] == author_code)]
+            # find duplicate rows in clb_trl database
+            df_dup_record = bib_fin.clb_trl[(bib_fin.clb_trl['title_trl'] == title) & (bib_fin.clb_trl['author_code'] == author_code) & (bib_fin.clb_trl['pub_year'] == year)]
+            
             if df_dup_record.empty:
                 if 'kniha' in row['Typ záznamu']: 
                     record = bib_fin.create_record_book(row, df)
@@ -331,13 +315,14 @@ if __name__ == "__main__":
             else: 
                 matching_row = df_dup_record.iloc[0]
                 if matching_row['finished']:
-                    duplications_finished.append({author_name:title})
+                    duplications_finished.append({author_name:[title, year]})
                     dup_count_fin += 1
+                    found_records.append(df_dup_record)
                 else:
                     duplications_unfinished.append({author_name:title})
                     dup_count_unfin += 1    
-    print(dup_count_fin)
-    print( duplications_finished)  
-    print(dup_count_unfin)
-    print(duplications_unfinished)                
+    # print(dup_count_fin)
+    # print( duplications_finished)  
+    # print(dup_count_unfin)
+    # print(duplications_unfinished)                
     writer.close()

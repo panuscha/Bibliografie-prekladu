@@ -5,17 +5,16 @@ from pymarc.field import Field
 from datetime import datetime
 import re
 import random
+import pickle
 
-
-def delete_whitespaces(string):
-    """Method for deleting unnecessary spaces and new lines in strings"""   
-    while string[0] == '\n' or string[0] == ' ':  
-        string = string[1:]
-    while string[-1] == '\n' or string[-1] == ' ': 
-        string = string[0:-1]
-    return string    
 
 class Bibliografie_record(ABC): 
+
+    def __init__(self, finalauthority_path, dict_author_work, identifiers, **kwargs):
+        self.finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
+        self.finalauthority.index= self.finalauthority['nkc_id']
+        self.dict_author_work = pickle.load(open(dict_author_work, "rb" ))
+        self.identifiers = identifiers 
     
     @abstractmethod
     def add_008(self,row, record, lang):
@@ -141,7 +140,8 @@ class Bibliografie_record(ABC):
             if original_work_title is not None:     
                 record['595'].add_subfield(code = 't', value=original_work_title)
             if id is not None:
-                record['595'].add_subfield(code = '1', value=id)                  
+                record['595'].add_subfield(code = '1', value=id)   
+            # TODO: find out if this is correct  - two 595 fields                 
         if not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
             record.add_ordered_field(Field(tag='595', indicators = [' ', ' '], subfields = [Subfield(code='i', value="Zdroj překladu:"),
                                                                                             Subfield(code='t', value=row['Údaje o zprostředkovacím díle'].strip())]))
@@ -230,13 +230,15 @@ class Bibliografie_record(ABC):
                     city =  re.search('^[\w\s]+', element).group(0).strip()
 
                 publisher = re.search('(?<=\:\s).+', element)
-                if str(row['Rok']).isnumeric(): 
-                    year = str(int(row['Rok']))
-                else:
-                    if '.0' in str(row['Rok']):
-                        year = str(float(row['Rok'])).rstrip("0").rstrip(".")
-                    else:
-                        year = row['Rok']    
+                # if str(row['Rok']).isnumeric(): 
+                #     year = str(int(row['Rok']))
+                # else:
+                #     if '.0' in str(row['Rok']):
+                #         year = str(float(row['Rok'])).rstrip("0").rstrip(".")
+                #     else:
+                #         year = row['Rok']    
+
+                year = row['Rok']
 
                 if publisher:
                     publisher = publisher.group(0).strip()          
@@ -307,12 +309,34 @@ class Bibliografie_record(ABC):
                 c += translators    
         if not pd.isnull(liability):
             c += ' ; ' + str(liability).strip()   
-        return c    
+        return c  
+      
+    def add_994_book(self, row, df, record):
+        """Adds id's of all parts of the collective work to field 994."""
+        cislo_zaznamu = row['Číslo záznamu']
+        is_part_of = df['Je součást čeho (číslo záznamu)']==cislo_zaznamu
+        if any(is_part_of):
+            book_rows = [i for i, val in enumerate(is_part_of) if val]
+            for i in book_rows:
+                r = df.iloc[i]
+                number = self.tag+"".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(r['Číslo záznamu'])
+                record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'DN'),
+                                                                                                Subfield(code = 'b',value = number)] ))   
+        return record             
+    
+    def add_994_part_of_book(self, row, record):
+        """Adds id of the collective work to field 994."""
+        is_part_of = str(int(row['Je součást čeho (číslo záznamu)']))
+        number = self.tag + "".join(['0' for a in range(6-len(is_part_of))]) + is_part_of
+        record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'UP'),
+                                                                                                Subfield(code = 'b',value = number)]))
+        return record
 
    
     def add_commmon(self, row, record, author, code, translators):
         """Adds data to fields that are common for all work types 
         """
+        record.add_ordered_field(Field(tag='001', indicators = [' ', ' '], data=str(self.tag+ "".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(row['Číslo záznamu']))))
         record.add_ordered_field(Field(tag='003', indicators = [' ', ' '], data='CZ PrUCL')) 
         
         if not(pd.isnull(row['ISBN'])):
@@ -335,6 +359,8 @@ class Bibliografie_record(ABC):
         record.add_ordered_field(Field(tag = '964', indicators=[' ', ' '], subfields=[Subfield(code='a', value= 'TRL'),] ) )
         record.add_ordered_field(Field(tag = 'OWN', indicators = [' ', ' '], subfields = [Subfield(code='a', value= 'UCLA'),]))
         return record
+    
+
 
 
     

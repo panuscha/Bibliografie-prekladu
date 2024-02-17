@@ -10,11 +10,10 @@ import pickle
 
 
 class Bibliografie_record_gre(Bibliografie_record):
-    def __init__(self, finalauthority, dict_author_work, identifiers):
+    def __init__(self, finalauthority_path, dict_author_work, identifiers):
+        super(Bibliografie_record_gre, self).__init__(finalauthority_path, dict_author_work, identifiers)
         self.greek_articles =  ['ένα', 'έναν', 'ένας', 'ενός','η','μια','μια(ν)','μιας','ο','οι', 'τα','τη(ν)','της','τις','το','τον','του','τους','των']  ## TODO: ADD GREEK ARTICLES
-        self.finalauthority = finalauthority
-        self.dict_author_work = dict_author_work
-        self.identifiers = identifiers  
+        self.tag = 'gr23' 
         
     def get_translators_and_other_roles(self, other_roles, record):
         # Regex pattern to match text between parentheses  
@@ -191,8 +190,6 @@ class Bibliografie_record_gre(Bibliografie_record):
                     subfields = field.subfields_as_dict()
                     field.add_subfield(code = '6', value= '{code}-0{last}/(S'.format(code = code, last = str(l)) )
                     
-
-
                     for subfield_code, subfield_value in subfields.items():
                         field.delete_subfield(subfield_code)
                         field.add_subfield(code = subfield_code, value = subfield_value[0])
@@ -218,7 +215,7 @@ class Bibliografie_record_gre(Bibliografie_record):
     
     def add_common_specific(self, row, record, author, translators):
         " 001, 240, title, subtitle, liability -> 245"    
-        record.add_ordered_field(Field(tag='001', indicators = [' ', ' '], data=str('gr23'+ "".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(row['Číslo záznamu']))))
+       
         if not(pd.isnull(row['Původní název'])) and not (("originál neznámý" in str(row['Původní název']).lower())  or ("originál neexistuje" in str(row['Původní název']).lower())):
             original_title = row['Původní název'].strip()  
             record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title),
@@ -232,26 +229,6 @@ class Bibliografie_record_gre(Bibliografie_record):
          
         return record 
   
-    def add_994_book(self, row, df, record):
-        """Adds id's of all parts of the collective work to field 994."""
-        cislo_zaznamu = row['Číslo záznamu']
-        is_part_of = df['Je součást čeho (číslo záznamu)']==cislo_zaznamu
-        if any(is_part_of):
-            book_rows = [i for i, val in enumerate(is_part_of) if val]
-            for i in book_rows:
-                r = df.iloc[i]
-                number = 'gr23'+"".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(r['Číslo záznamu'])
-                record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'DN'),
-                                                                                                Subfield(code = 'b',value = number)] ))
-        return record         
-
-    def add_994_part_of_book(self, row, record):
-        """Adds id of the collective work to field 994."""
-        is_part_of = str(int(row['Je součást čeho (číslo záznamu)']))
-        number = 'gr23'+"".join(['0' for a in range(6-len(is_part_of))]) + is_part_of
-        record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'UP'),
-                                                                                                Subfield(code = 'b',value = number)]))
-        return record
     
     def create_record_part_of_book(self, row, df):
         """Creates record for part of the book.
@@ -261,24 +238,27 @@ class Bibliografie_record_gre(Bibliografie_record):
         record.leader = '-----naa---------4i-4500'  
         ind = row['Je součást čeho (číslo záznamu)']
         book_row = df.loc[df['Číslo záznamu'] == ind]
+        
+        # from Dataframe to Pandas Series
+        book_row = book_row.squeeze()
+
         # is the author same as in the collective work, or does the book has it's own author 
         if pd.isnull(row['Autor/ka + kód autority']):
-            tup, record = self.add_author_code(book_row['Autor/ka + kód autority'].values[0], record)
+            tup, record = self.add_author_code(book_row['Autor/ka + kód autority'], record)
         else:
             tup, record  = self.add_author_code(row['Autor/ka + kód autority'], record)
         author = tup[0] 
         code = tup[1]    
   
-        if not pd.isnull(book_row['Další role'].values[0]):
-            translators, record = self.get_translators_and_other_roles(book_row['Další role'].values[0], record)  ##  TODO: PREPSAT TAK ABY SOUHLASILO 880
+        if not pd.isnull(book_row['Další role']):
+            translators, record = self.get_translators_and_other_roles(book_row['Další role'], record)  ##  TODO: PREPSAT TAK ABY SOUHLASILO 880
         else:
             translators = None    
 
         if not pd.isnull(book_row['Edice, svazek'].values[0]):    
             record = self.add_490(book_row['Edice, svazek'].values[0], record)    
             
-        # from Dataframe to Pandas Series
-        book_row = book_row.squeeze()
+        
         record = self.add_041(book_row, record)   
         record = self.add_008(book_row, record)
         record = self.add_264(book_row, record)
@@ -361,29 +341,9 @@ if __name__ == "__main__":
     czech_translations="data/czech_translations_full_18_01_2022.mrc" # obohacovat o kody 595
     # list of identifiers
     identifiers = []
-    # dictionary with author - work:id pairs
-    dict_author_work = {}
 
-    # saves data from czech_translations file to dictionary dict_author_work  
-    with open(czech_translations, 'rb') as data:
-        reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
-        for record in reader:
-            if not record is None:
-                for field in  record.get_fields('595') : 
-                    if all([ x in str(field)  for x in ['$1', '$a', '$t']  ]): # if '$1' in str(field) and '$a' in str(field) and '$t' in str(field):
-                        id = record['595']['1']
-                        if not id in identifiers:
-                            identifiers.append(id)
-                        author = record['595']['a']
-                        author = author[0:len(author)-1]
-                        title = record['595']['t']
-                        if not title is None: 
-                            if title[-1] == '.':
-                                title = title[0:len(title)-1]
-                            if author.lower() in dict_author_work.keys():
-                                dict_author_work[author.lower()].update({title.lower() : id })  
-                            else:
-                                dict_author_work[author.lower()] = {title.lower() : id }
+    dict_author_work_path = "data/dict_author_work.obj"
+
     # initial table 
     IN = 'data/preklady/Bibliografie_prekladu_gre.csv'
     # final file
@@ -393,11 +353,9 @@ if __name__ == "__main__":
 
     # table with authority codes
     finalauthority_path = 'data/finalauthority_simple.csv'
-    finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
-    finalauthority.index= finalauthority['nkc_id']
-        # writes data to file in variable OUT
-        
+
     err = []  
+    # writes data to file in variable OUT
     file = open("data/dict_author_work.obj",'rb')
     dict_author_work = pickle.load(file)  
         
@@ -408,7 +366,7 @@ if __name__ == "__main__":
                 if isinstance(row['Typ záznamu'], str):
                     print(row['Číslo záznamu'])
                     print(row['Typ záznamu'])
-                    bib_gre = Bibliografie_record_gre(finalauthority = finalauthority, dict_author_work= dict_author_work, identifiers=identifiers)
+                    bib_gre = Bibliografie_record_gre(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, identifiers=identifiers)
                     if 'kniha' in row['Typ záznamu']: 
                         record = bib_gre.create_record_book(row, df)
                     if 'část knihy' in row['Typ záznamu']: 

@@ -9,11 +9,10 @@ import random
 
 class Bibliografie_record_ita(Bibliografie_record): 
     
-    def __init__(self, finalauthority, dict_author_work, identifiers):
+    def __init__(self, finalauthority_path, dict_author_work, identifiers):
+        super(Bibliografie_record_ita, self).__init__(finalauthority_path, dict_author_work, identifiers)
         self.italian_articles =  ['il', 'lo', 'la', 'gli', 'le', 'i', 'un', 'una', 'uno', 'dei', 'degli', 'delle']
-        self.finalauthority = finalauthority
-        self.dict_author_work = dict_author_work
-        self.identifiers = identifiers 
+        self.tag = 'it22'
     
     def add_008(self, row, record):
         """Creates fixed length data and adds them to field 008 """ 
@@ -91,7 +90,6 @@ class Bibliografie_record_ita(Bibliografie_record):
                 
     def add_common_specific(self, row, record, author, translators):
         " 001, 240, title, subtitle, liability -> 245"
-        record.add_ordered_field(Field(tag='001', indicators = [' ', ' '], data=str('it22'+ "".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(row['Číslo záznamu'])))) 
         if not(pd.isnull(row['Původní název'])) and not (("originál neznámý" in str(row['Původní název']).lower())  or ("originál neexistuje" in str(row['Původní název']).lower())):
             original_title = row['Původní název'].strip()                                                                       
             record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title),
@@ -105,26 +103,6 @@ class Bibliografie_record_ita(Bibliografie_record):
         record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= "Záznam zpracován bez výtisku v ruce"), ]))
         return record 
     
-    def add_994_book(self, row, df, record):
-        """Adds id's of all parts of the collective work to field 994."""
-        cislo_zaznamu = row['Číslo záznamu']
-        is_part_of = df['Je součást čeho (číslo záznamu)']==cislo_zaznamu
-        if any(is_part_of):
-            book_rows = [i for i, val in enumerate(is_part_of) if val]
-            for i in book_rows:
-                r = df.iloc[i]
-                number = "it22"+"".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(r['Číslo záznamu'])
-                record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'DN'),
-                                                                                                Subfield(code = 'b',value = number)] ))   
-        return record             
-    
-    def add_994_part_of_book(self, row, record):
-        """Adds id of the collective work to field 994."""
-        is_part_of = str(int(row['Je součást čeho (číslo záznamu)']))
-        number = "it22"+"".join(['0' for a in range(6-len(is_part_of))]) + is_part_of
-        record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'DN'),
-                                                                                                Subfield(code = 'b',value = number)]))
-        return record
     
     def create_record_book(self,row, df):
         """Creates record for book.
@@ -195,29 +173,8 @@ if __name__ == "__main__":
     czech_translations="data/czech_translations_full_18_01_2022.mrc"
     # list of identifiers
     identifiers = []
-    # dictionary with author - work:id pairs
-    dict_author_work = {}
 
-    # saves data from czech_translations file to dictionary dict_author_work  
-    with open(czech_translations, 'rb') as data:
-        reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
-        for record in reader:
-            if not record is None:
-                for field in  record.get_fields('595') : 
-                    if all([ x in str(field)  for x in ['$1', '$a', '$t']  ]): # if '$1' in str(field) and '$a' in str(field) and '$t' in str(field):
-                        id = record['595']['1']
-                        if not id in identifiers:
-                            identifiers.append(id)
-                        author = record['595']['a']
-                        author = author[0:len(author)-1]
-                        work = record['595']['t']
-                        if not work is None: 
-                            if work[-1] == '.':
-                                work = work[0:len(work)-1]
-                            if author.lower() in dict_author_work.keys():
-                                dict_author_work[author.lower()].update({work.lower() : id })  
-                            else:
-                                dict_author_work[author.lower()] = {work.lower() : id }
+    dict_author_work_path = "data/dict_author_work.obj"
     # initial table 
     IN = 'data/preklady/Bibliografie_prekladu_it.csv'
     # final file
@@ -227,14 +184,13 @@ if __name__ == "__main__":
 
     # table with authority codes
     finalauthority_path = 'data/finalauthority_simple.csv'
-    finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
-    finalauthority.index= finalauthority['nkc_id']
-        # writes data to file in variable OUT
+
+    # writes data to file in variable OUT
     with open(OUT , 'wb') as writer:
         #iterates all rows in the table
         for index, row in df.iterrows():
             print(row['Číslo záznamu'])
-            bib_ita = Bibliografie_record_ita(finalauthority = finalauthority, dict_author_work= dict_author_work, identifiers=identifiers)
+            bib_ita = Bibliografie_record_ita(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, identifiers=identifiers)
             if 'kniha' in row['Typ záznamu']: 
                 record = bib_ita.create_record_book(row, df)
             if 'část knihy' in row['Typ záznamu']: 
