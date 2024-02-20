@@ -10,10 +10,11 @@ import pickle
 
 class Bibliografie_record(ABC): 
 
-    def __init__(self, finalauthority_path, dict_author_work, identifiers, **kwargs):
+    def __init__(self, finalauthority_path, dict_author_work_path,dict_author_code_work_path, identifiers, **kwargs):
         self.finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
         self.finalauthority.index= self.finalauthority['nkc_id']
-        self.dict_author_work = pickle.load(open(dict_author_work, "rb" ))
+        self.dict_author_work = pickle.load(open(dict_author_work_path, "rb" ))
+        self.dict_author_code_work = pickle.load(open(dict_author_code_work_path, "rb" ))
         self.identifiers = identifiers 
     
     @abstractmethod
@@ -115,13 +116,27 @@ class Bibliografie_record(ABC):
             else:
                 date = None            
                 id = self.generate_id(code)
-            if not author.lower() in self.dict_author_work.keys():
+            if not code in self.dict_author_code_work.keys():
                 if original_work_title is None:
                     id = None  
+                elif not author.lower() in self.dict_author_work.keys():
+                    if original_work_title is None:
+                        id = None  
+                    else:
+                        id = self.generate_id(code)          
                 else:
-                    id = self.generate_id(code)          
+                    dict_titles = self.dict_author_work[author.lower()]
+                    if original_work_title is not None and original_work_title.lower() in dict_titles.keys():
+                        id = dict_titles[original_work_title.lower()]
+                    else:
+                        if original_work_title is None:
+                            id = None  
+                        else:
+                            id = self.generate_id(code) 
+                            dict_titles[original_work_title] = id
+                            self.dict_author_work[author.lower()] = dict_titles
             else:
-                dict_titles = self.dict_author_work[author.lower()]
+                dict_titles = self.dict_author_code_work[code]
                 if original_work_title is not None and original_work_title.lower() in dict_titles.keys():
                     id = dict_titles[original_work_title.lower()]
                 else:
@@ -130,7 +145,7 @@ class Bibliografie_record(ABC):
                     else:
                         id = self.generate_id(code) 
                         dict_titles[original_work_title] = id
-                        self.dict_author_work[author.lower()] = dict_titles
+                        self.dict_author_code_work[code] = dict_titles                
 
             record.add_ordered_field(Field(tag='595', indicators = ['1', '2'], subfields = [Subfield(code='a', value=author)  ]))
             if date is not None: 

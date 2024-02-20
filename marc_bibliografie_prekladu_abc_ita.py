@@ -9,8 +9,8 @@ import random
 
 class Bibliografie_record_ita(Bibliografie_record): 
     
-    def __init__(self, finalauthority_path, dict_author_work, identifiers):
-        super(Bibliografie_record_ita, self).__init__(finalauthority_path, dict_author_work, identifiers)
+    def __init__(self, finalauthority_path, dict_author_work,dict_author__code_work_path, identifiers):
+        super(Bibliografie_record_ita, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers)
         self.italian_articles =  ['il', 'lo', 'la', 'gli', 'le', 'i', 'un', 'una', 'uno', 'dei', 'degli', 'delle']
         self.tag = 'it22'
     
@@ -175,6 +175,8 @@ if __name__ == "__main__":
     identifiers = []
 
     dict_author_work_path = "data/dict_author_work.obj"
+
+    dict_author__code_work_path =  "data/dict_author_code_work.obj"
     # initial table 
     IN = 'data/preklady/Bibliografie_prekladu_it.csv'
     # final file
@@ -190,7 +192,8 @@ if __name__ == "__main__":
         #iterates all rows in the table
         for index, row in df.iterrows():
             print(row['Číslo záznamu'])
-            bib_ita = Bibliografie_record_ita(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, identifiers=identifiers)
+            bib_ita = Bibliografie_record_ita(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
+                                              dict_author__code_work_path = dict_author__code_work_path, identifiers=identifiers)
             if 'kniha' in row['Typ záznamu']: 
                 record = bib_ita.create_record_book(row, df)
             if 'část knihy' in row['Typ záznamu']: 

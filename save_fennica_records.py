@@ -1,12 +1,13 @@
 import pandas as pd
 from pymarc import map_xml, MARCWriter
+from marc_extra_codes import load_df_csv
 
 path = 'data/fennica.mrcx'
 
 OUT = 'data/fennica_preklady.mrc'
 
 df_path = 'data/preklady/Bibliografie_prekladu_fin.csv'
-df = pd.read_csv(df_path, encoding='utf_8')
+df = load_df_csv(df_path)
 
 fennica_id = df['Finské id']
 fennica_id = [str(id) for id in fennica_id] 

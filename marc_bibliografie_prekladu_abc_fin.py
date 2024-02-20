@@ -11,8 +11,8 @@ import marc_extra_codes
 
 class Bibliografie_record_fin(Bibliografie_record): 
     
-    def __init__(self, finalauthority_path, dict_author_work, identifiers, fennica_path, clb_trl_path):
-        super(Bibliografie_record_fin, self).__init__(finalauthority_path, dict_author_work, identifiers)
+    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers, fennica_path, clb_trl_path):
+        super(Bibliografie_record_fin, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers)
         self.tag = "fi24"
         self.df_fennica = pickle.load(open(fennica_path, "rb" ))
         self.clb_trl = pickle.load(open(clb_trl_path, "rb" ))
@@ -211,7 +211,7 @@ class Bibliografie_record_fin(Bibliografie_record):
             author = tup[0] 
             code = tup[1]    
             
-        if not pd.isnull(book_row['Další role'].values):
+        if not pd.isnull(book_row['Další role']):
             translators, record = self.get_translators_and_other_roles(book_row['Další role'], record) 
         else:
             translators = None  
@@ -250,14 +250,15 @@ class Bibliografie_record_fin(Bibliografie_record):
         if not pd.isnull(row["Finské id"]):
             finnish_id = row["Finské id"]
             fennica_info = self.df_fennica[self.df_fennica.index==finnish_id].squeeze()
-
-            ### 008
-            fennica_008 = fennica_info['008'][0]
-            clb_008 = list(record['008'].data)
-            for i in range(14, 38):
-                if fennica_008[i].isalnum() and not clb_008[i].isalnum():
-                    clb_008[i] = fennica_008[i]
-            record['008'].data = ''.join(clb_008)        
+            
+            if not fennica_info.empty:    
+                ### 008
+                fennica_008 = fennica_info['008'][0]
+                clb_008 = list(record['008'].data)
+                for i in range(14, 38):
+                    if fennica_008[i].isalnum() and not clb_008[i].isalnum():
+                        clb_008[i] = fennica_008[i]
+                record['008'].data = ''.join(clb_008)        
             print(record)
 if __name__ == "__main__":
     
@@ -278,8 +279,8 @@ if __name__ == "__main__":
 
 
     dict_author_work_path = "data/dict_author_work.obj"
-
-
+    dict_author__code_work_path = "data/dict_author_code_work.obj"
+    
     duplications_finished = []
     duplications_unfinished = []
     dup_count_fin = 0
@@ -291,7 +292,8 @@ if __name__ == "__main__":
         #iterates all rows in the table
         for index, row in df.iterrows():
             print(row['Číslo záznamu'])
-            bib_fin = Bibliografie_record_fin(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, identifiers=identifiers, 
+            bib_fin = Bibliografie_record_fin(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
+                                              dict_author__code_work_path =  dict_author__code_work_path, identifiers=identifiers, \
                                               fennica_path="data/fennica_czech.obj", clb_trl_path="data/clb_trl_fin.obj")
             title = row['Název díla dle titulu v latince']
             (author_name,author_code), _  = bib_fin.add_author_code(row['Autor/ka + kód autority'], Record(to_unicode=True,
@@ -304,7 +306,7 @@ if __name__ == "__main__":
             df_dup_record = bib_fin.clb_trl[(bib_fin.clb_trl['title_trl'] == title) & (bib_fin.clb_trl['author_code'] == author_code) & (bib_fin.clb_trl['pub_year'] == year)]
             
             if df_dup_record.empty:
-                if 'kniha' in row['Typ záznamu']: 
+                if 'kniha' or 'antologie' in row['Typ záznamu']: 
                     record = bib_fin.create_record_book(row, df)
                 if 'část knihy' in row['Typ záznamu']: 
                     record = bib_fin.create_record_part_of_book(row, df)

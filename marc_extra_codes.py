@@ -64,6 +64,34 @@ def create_dict_author_work(path, tag):
 
     return dict_author_work    
 
+def create_dict_author_work_excel(path, tag):
+    "Creates dictionary with authors - title:id pairs"
+    # list of identifiers
+    identifiers = []
+    # dictionary with author - work:id pairs
+    dict_author_work = {}
+    with open(path, 'rb') as data:
+        reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
+        for record in reader:
+            if not record is None:
+                for field in  record.get_fields('595') : 
+                    if all([ x in str(field)  for x in ['$1', '$t', '$'+tag]  ]): # if '$1' in str(field) and '$a' in str(field) and '$t' in str(field):
+                        id = record['595']['1']
+                        if not id in identifiers:
+                            identifiers.append(id)
+                        author = record['595'][tag]
+                        author = author[0:len(author)-1]
+                        work = record['595']['t']
+                        if not work is None: 
+                            if work[-1] == '.':
+                                work = work[0:len(work)-1]
+                            if author.lower() in dict_author_work.keys():
+                                dict_author_work[author.lower()].update({work.lower() : id })  
+                            else:
+                                dict_author_work[author.lower()] = {work.lower() : id } 
+
+    return dict_author_work   
+
    
 
 def import_bib_translations(path, lang):
@@ -110,9 +138,9 @@ def import_bib_translations(path, lang):
 def load_df_csv(path): 
     df = pd.read_csv(path, encoding='utf_8')       
     df["Číslo záznamu"] = df["Číslo záznamu"].apply(lambda x: int(x) if not(pd.isnull(x)) else np.nan)
-    df["Finské id"] = df["Finské id"].apply(lambda x: str(x) if not(pd.isnull(x)) else np.nan)
+    df["Finské id"] = df["Finské id"].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
     df['Typ záznamu'] = df['Typ záznamu'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Je součást čeho (číslo záznamu)'] = df['Je součást čeho (číslo záznamu)'].apply(lambda x: str(int(x)) if not(pd.isnull(x)) and x.isnumeric() else np.nan)
+    df['Je součást čeho (číslo záznamu)'] = df['Je součást čeho (číslo záznamu)'].apply(lambda x: str(int(x)).strip() if not(pd.isnull(x)) and x.isnumeric() else np.nan)
     df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] = df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
     df['Vztah k originálu (překlad vs. adaptace)'] = df['Vztah k originálu (překlad vs. adaptace)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
     df['Druh adaptace (slovem)'] = df['Druh adaptace (slovem)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)

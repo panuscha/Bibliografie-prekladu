@@ -10,8 +10,8 @@ import pickle
 
 
 class Bibliografie_record_gre(Bibliografie_record):
-    def __init__(self, finalauthority_path, dict_author_work, identifiers):
-        super(Bibliografie_record_gre, self).__init__(finalauthority_path, dict_author_work, identifiers)
+    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers):
+        super(Bibliografie_record_gre, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers)
         self.greek_articles =  ['ένα', 'έναν', 'ένας', 'ενός','η','μια','μια(ν)','μιας','ο','οι', 'τα','τη(ν)','της','τις','το','τον','του','τους','των']  ## TODO: ADD GREEK ARTICLES
         self.tag = 'gr23' 
         
@@ -344,6 +344,7 @@ if __name__ == "__main__":
 
     dict_author_work_path = "data/dict_author_work.obj"
 
+    dict_author__code_work_path = "data/dict_author_code_work.obj"
     # initial table 
     IN = 'data/preklady/Bibliografie_prekladu_gre.csv'
     # final file
@@ -366,7 +367,8 @@ if __name__ == "__main__":
                 if isinstance(row['Typ záznamu'], str):
                     print(row['Číslo záznamu'])
                     print(row['Typ záznamu'])
-                    bib_gre = Bibliografie_record_gre(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, identifiers=identifiers)
+                    bib_gre = Bibliografie_record_gre(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
+                                                      dict_author__code_work_path = dict_author__code_work_path, identifiers=identifiers)
                     if 'kniha' in row['Typ záznamu']: 
                         record = bib_gre.create_record_book(row, df)
                     if 'část knihy' in row['Typ záznamu']: 
