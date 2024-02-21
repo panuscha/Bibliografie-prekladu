@@ -52,11 +52,9 @@ def create_dict_author_work(path, tag):
                         if not id in identifiers:
                             identifiers.append(id)
                         author = record['595'][tag]
-                        author = author[0:len(author)-1]
+                        author = author.strip(" ,.")
                         work = record['595']['t']
                         if not work is None: 
-                            if work[-1] == '.':
-                                work = work[0:len(work)-1]
                             if author.lower() in dict_author_work.keys():
                                 dict_author_work[author.lower()].update({work.lower() : id })  
                             else:
@@ -64,31 +62,36 @@ def create_dict_author_work(path, tag):
 
     return dict_author_work    
 
-def create_dict_author_work_excel(path, tag):
+def create_dict_author_work_excel(path, author_column):
     "Creates dictionary with authors - title:id pairs"
     # list of identifiers
     identifiers = []
     # dictionary with author - work:id pairs
     dict_author_work = {}
-    with open(path, 'rb') as data:
-        reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
-        for record in reader:
-            if not record is None:
-                for field in  record.get_fields('595') : 
-                    if all([ x in str(field)  for x in ['$1', '$t', '$'+tag]  ]): # if '$1' in str(field) and '$a' in str(field) and '$t' in str(field):
-                        id = record['595']['1']
-                        if not id in identifiers:
-                            identifiers.append(id)
-                        author = record['595'][tag]
-                        author = author[0:len(author)-1]
-                        work = record['595']['t']
-                        if not work is None: 
-                            if work[-1] == '.':
-                                work = work[0:len(work)-1]
-                            if author.lower() in dict_author_work.keys():
-                                dict_author_work[author.lower()].update({work.lower() : id })  
-                            else:
-                                dict_author_work[author.lower()] = {work.lower() : id } 
+
+    df_work_database = pd.read_excel(path)
+    for column in df_work_database.columns:
+        df_work_database[column] = df_work_database[column].apply(lambda x: str(x))
+
+    
+
+    # with open(path, 'rb') as data:
+    #     reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
+    #     for record in reader:
+    #         if not record is None:
+    #             for field in  record.get_fields('595') : 
+    #                 if all([ x in str(field)  for x in ['$1', '$t', '$'+tag]  ]): # if '$1' in str(field) and '$a' in str(field) and '$t' in str(field):
+    for _, row in df_work_database.iterrows():
+        id = row["perzistentní ID díla"]
+        if not id in identifiers:
+            identifiers.append(id)
+        author = row[author_column].strip(" ,.")
+        work = row["normalizovaný název"].strip(" ,.")
+        if not work is None: 
+            if author.lower() in dict_author_work.keys():
+                dict_author_work[author.lower()].update({work.lower() : id })  
+            else:
+                dict_author_work[author.lower()] = {work.lower() : id } 
 
     return dict_author_work   
 
@@ -140,7 +143,7 @@ def load_df_csv(path):
     df["Číslo záznamu"] = df["Číslo záznamu"].apply(lambda x: int(x) if not(pd.isnull(x)) else np.nan)
     df["Finské id"] = df["Finské id"].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
     df['Typ záznamu'] = df['Typ záznamu'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Je součást čeho (číslo záznamu)'] = df['Je součást čeho (číslo záznamu)'].apply(lambda x: str(int(x)).strip() if not(pd.isnull(x)) and x.isnumeric() else np.nan)
+    df['Je součást čeho (číslo záznamu)'] = df['Je součást čeho (číslo záznamu)'].apply(lambda x: int(x) if not(pd.isnull(x)) and x.isnumeric() else np.nan)
     df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] = df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
     df['Vztah k originálu (překlad vs. adaptace)'] = df['Vztah k originálu (překlad vs. adaptace)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
     df['Druh adaptace (slovem)'] = df['Druh adaptace (slovem)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
@@ -175,5 +178,5 @@ if __name__ == "__main__":
     # df = pd.DataFrame(df_dict)
     # pickle.dump( df, open( "data/clb_trl_{lang}.obj".format(lang =lang), "wb" ) )
     # print(df)
-    dict_author_code_work = create_dict_author_work("data/czech_translations_full_18_01_2022.mrc", '7')
-    pickle.dump( dict_author_code_work, open( "data/dict_author_code_work.obj", "wb" ) )
+    dict_author_code_work = create_dict_author_work_excel("data/work-database_archive.xlsx", 'autor')
+    pickle.dump( dict_author_code_work, open( "data/dict_author_work.obj", "wb" ) )

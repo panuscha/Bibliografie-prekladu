@@ -68,19 +68,22 @@ class Bibliografie_record(ABC):
         In case there is no authority code, id is random.
         Otherwise generates id from the authority code.""" 
         ID_LENGTH = 11
+        lowest = 10000
+        highest = 99999
         if code is None:
-            rand_number = str(random.randint(00000000000,99999999999))
+            rand_number = str(random.randint(000000000000,999999999999))
             # in case random number has less than 11 positions, add zeros at the beginning
             if len(rand_number) < ID_LENGTH:
                 for i in range(ID_LENGTH-len(rand_number)):
                     rand_number = "0" + rand_number
             return "ubc"+rand_number
-        rand_number = str(random.randint(1000,9999))
-        ret = "ubc"+code[0:4]+str(code[-2:])+rand_number
+        #rand_number = str(random.randint(1000,9999))
+        rand_number = str(random.randint(lowest,highest))
+        ret = "ubc"+code[0:4]+str(code[-2:])+"-"+rand_number
         # in case generated id already exists, create a new one
         while ret in self.identifiers:
-            rand_number = str(random.randint(1000,9999))
-            ret = "ubc"+code[0:4]+str(code[-2:])+rand_number
+            rand_number = str(random.randint(lowest,highest))
+            ret = "ubc"+code[0:4]+str(code[-2:])+"-"+rand_number
         return ret  
     
     def add_041(self, row, record):
@@ -157,9 +160,26 @@ class Bibliografie_record(ABC):
             if id is not None:
                 record['595'].add_subfield(code = '1', value=id)   
             # TODO: find out if this is correct  - two 595 fields                 
-        if not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
+        elif not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
             record.add_ordered_field(Field(tag='595', indicators = [' ', ' '], subfields = [Subfield(code='i', value="Zdroj překladu:"),
                                                                                             Subfield(code='t', value=row['Údaje o zprostředkovacím díle'].strip())]))
+        return record
+    
+    def add_008(self, row, record, publication_country, language):
+        """Creates fixed length data and adds them to field 008 """ 
+        date_record_creation = str(datetime.today().strftime('%y%m%d'))
+        letter = 's'
+
+        if pd.isnull(row['Rok']):
+            publication_date = '--------'
+        else:
+            publication_date = str(int(row['Rok']))+ '----' 
+
+        material_specific =  '-----------------'
+        modified = '-'
+        cataloging_source = 'd'
+        data = date_record_creation + letter + publication_date +  publication_country + material_specific + language + modified + cataloging_source
+        record.add_ordered_field(Field(tag='008', indicators = [' ', ' '], data = data))
         return record
 
 

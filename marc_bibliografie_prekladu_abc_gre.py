@@ -65,41 +65,6 @@ class Bibliografie_record_gre(Bibliografie_record):
         if translators != '': return translators, record 
         else: return None, record              
         
-    def add_008(self, row, record):
-        """Creates fixed length data and adds them to field 008 """ 
-        date_record_creation = str(datetime.today().strftime('%y%m%d'))
-        letter = 's'
-
-        if pd.isnull(row['Rok']):
-            publication_date = '--------'
-        elif  row['Rok'].isnumeric():   
-            publication_date = str(int(row['Rok']))+ '----' 
-        else:
-            publication_date = row['Rok']+ '----' 
-
-        if pd.isnull(row['Město vydání, země vydání, nakladatel']):
-            publication_country = 'xx-'
-
-        else:
-            publication = row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if country == 'Česká republika':
-                publication_country = 'xr-'
-            elif country == 'Řecko':
-                publication_country = 'gr-'    ## GREECE - > GR ????      
-            else:
-                publication_country = 'xx-'
-
-        material_specific =  '-----------------'
-        language = 'gre'
-        modified = '-'
-        cataloging_source = 'd'
-        data = date_record_creation + letter + publication_date +  publication_country + material_specific + language + modified + cataloging_source
-        record.add_ordered_field(Field(tag='008', indicators = [' ', ' '], data = data))   
-        return record
-    
     
     def calculate_articles(self, row):
         title = str(row["Název díla v původním písmu"])
@@ -257,9 +222,24 @@ class Bibliografie_record_gre(Bibliografie_record):
 
         if not pd.isnull(book_row['Edice, svazek'].values[0]):    
             record = self.add_490(book_row['Edice, svazek'].values[0], record)    
+
+        if pd.isnull(book_row['Město vydání, země vydání, nakladatel']):
+            publication_country = 'xx-'
+
+        else:
+            publication = book_row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Česká republika':
+                publication_country = 'xr-'
+            elif country == 'Řecko':
+                publication_country = 'gr-'    ## GREECE - > GR ????      
+            else:
+                publication_country = 'xx-'    
             
         
-        record = self.add_041(book_row, record)   
+        record = self.add_041(book_row, record, publication_country, "gre")   
         record = self.add_008(book_row, record)
         record = self.add_264(book_row, record)
         record = self.add_commmon(row, record, author, code, translators)
@@ -288,9 +268,24 @@ class Bibliografie_record_gre(Bibliografie_record):
         record = self.add_041(row, record)  
            
         if not pd.isnull(row['Edice, svazek']):    
-            record = self.add_490(row['Edice, svazek'], record)      
+            record = self.add_490(row['Edice, svazek'], record)     
+
+        if pd.isnull(row['Město vydání, země vydání, nakladatel']):
+            publication_country = 'xx-'
+
+        else:
+            publication = row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Česká republika':
+                publication_country = 'xr-'
+            elif country == 'Řecko':
+                publication_country = 'gr-'    ## GREECE - > GR ????      
+            else:
+                publication_country = 'xx-'     
             
-        record = self.add_008(row, record)
+        record = self.add_008(row, record, publication_country, "gre")
         record = self.add_commmon(row, record, author, code, translators) 
         record = self.add_264(row, record)
         record = self.add_common_specific(row, record, author, translators)      
@@ -323,7 +318,22 @@ class Bibliografie_record_gre(Bibliografie_record):
                                                                                     Subfield(code='h', value= re.search('[^\s]+', str(row['Výchozí jazyk '])).group(0)),
                                                                                     Subfield(code='k', value= re.search('[^\s]+', str(row['Zprostředkovací jazyk'])).group(0)),]) )    
                 
-        record = self.add_008(row, record) 
+        if pd.isnull(row['Město vydání, země vydání, nakladatel']):
+            publication_country = 'xx-'
+
+        else:
+            publication = row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Česká republika':
+                publication_country = 'xr-'
+            elif country == 'Řecko':
+                publication_country = 'gr-'    ## GREECE - > GR ????      
+            else:
+                publication_country = 'xx-'
+        
+        record = self.add_008(row, record, publication_country, "gre") 
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_773(record, row)
         record = self.add_common_specific(row, record, author, translators)  

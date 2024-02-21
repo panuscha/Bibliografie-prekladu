@@ -66,54 +66,28 @@ class Bibliografie_record_fin(Bibliografie_record):
         print(translators)            
         if translators != '': return translators, record 
         else: return None, record      
-        
-    
-    def add_008(self, row, record):
-        """Creates fixed length data and adds them to field 008 """ 
-        date_record_creation = str(datetime.today().strftime('%y%m%d'))
-        letter = 's'
-
-        if pd.isnull(row['Rok']):
-            publication_date = '--------'
-        else:
-            publication_date = str(int(row['Rok']))+ '----' 
-
-        if pd.isnull(row['Město vydání, země vydání, nakladatel']):
-            publication_country = 'xx-'
-
-        else:
-            publication = row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if country == 'Finsko':
-                publication_country = 'fi-'
-            elif country == 'Česká republika':
-                publication_country = 'xr-'    
-            else:
-                publication_country = 'xx-'
-
-        material_specific =  '-----------------'
-        language = 'fin'
-        modified = '-'
-        cataloging_source = 'd'
-        data = date_record_creation + letter + publication_date +  publication_country + material_specific + language + modified + cataloging_source
-        record.add_ordered_field(Field(tag='008', indicators = [' ', ' '], data = data))
-        return record
     
 
     def add_035(self, row, record ):
         "Adds FENNICA catalogue number to 035$a"
         if not pd.isnull(row["Finské id"]):
             finnish_id = row["Finské id"]
-            record.add_ordered_field(Field(tag='035', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "(FENNICA)[{fennica}]".format(fennica = finnish_id))]))
+            fennica_info = self.df_fennica[self.df_fennica.index==finnish_id].squeeze()
+                
+            if fennica_info.empty:
+                finnish_id = row["Finské id"]
+                record.add_ordered_field(Field(tag='035', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "(FENNICA)[{fennica}]".format(fennica = finnish_id))]))
         return record
     
     def add_998(self, row, record ):
         "Adds Melinda hypertext to 998$a"
         if not pd.isnull(row["Finské id"]):
             finnish_id = row["Finské id"]
-            record.add_ordered_field(Field(tag='998', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "https://melinda.kansalliskirjasto.fi/byid/{fennica}".format(fennica = finnish_id))]))
+            fennica_info = self.df_fennica[self.df_fennica.index==finnish_id].squeeze()
+                
+            if fennica_info.empty:
+                finnish_id = row["Finské id"]
+                record.add_ordered_field(Field(tag='998', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "https://melinda.kansalliskirjasto.fi/byid/{fennica}".format(fennica = finnish_id))]))
         return record
 
         
@@ -129,12 +103,12 @@ class Bibliografie_record_fin(Bibliografie_record):
             c = row['Údaje o odpovědnosti a další informace (z titulní strany)']      # Údaje o odpovědnosti a další informace
         title = title.strip()      
         if subtitle == '' and c == '':                                                                          
-            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " ."), ]))                                                                          
+            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + "."), ]))                                                                          
         else:
             if c == '':
                 subtitle = subtitle.strip()
                 record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= title + " ."),]))
+                                                                                        Subfield(code='b', value= title + "."),]))
             elif subtitle == '':  
                 c = c.strip()    
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " /"),
@@ -176,14 +150,29 @@ class Bibliografie_record_fin(Bibliografie_record):
         if not pd.isnull(row['Další role']):
             translators, record = self.get_translators_and_other_roles(row['Další role'] , record)  
         else:
-            translators = None     
+            translators = None   
+
+        if pd.isnull(row['Město vydání, země vydání, nakladatel']):
+            publication_country = 'xx-'
+
+        else:
+            publication = row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Finsko':
+                publication_country = 'fi-'
+            elif country == 'Česká republika':
+                publication_country = 'xr-'    
+            else:
+                publication_country = 'xx-'      
           
-        record = self.add_008(row, record)
+        record = self.add_008(row, record, publication_country, "fin")
         record = self.add_commmon(row, record, author, code, translators)  
         record = self.add_common_specific(row, record, author, translators)    
         record = self.add_264(row, record)
-        if row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] == 'souborné dílo':
-            self.add_994_book(row, df, record)   
+        #if row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] == 'souborné dílo':
+        self.add_994_book(row, df, record)   
 
         self.mine_fennica(record, row)
         return record
@@ -195,7 +184,7 @@ class Bibliografie_record_fin(Bibliografie_record):
         record = Record(to_unicode=True,
             force_utf8=True)
         record.leader = '-----naa---------4i-4500'  
-        ind = int(row['Je součást čeho (číslo záznamu)'])
+        ind = row['Je součást čeho (číslo záznamu)']
         book_row = df.loc[df['Číslo záznamu'] == ind]
 
         # from Dataframe to Pandas Series
@@ -215,9 +204,25 @@ class Bibliografie_record_fin(Bibliografie_record):
             translators, record = self.get_translators_and_other_roles(book_row['Další role'], record) 
         else:
             translators = None  
+
+        if pd.isnull(book_row['Město vydání, země vydání, nakladatel']):
+            publication_country = 'xx-'
+
+        else:
+            publication = book_row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Finsko':
+                publication_country = 'fi-'
+            elif country == 'Česká republika':
+                publication_country = 'xr-'    
+            else:
+                publication_country = 'xx-'  
+
             
         
-        record = self.add_008(book_row, record)
+        record = self.add_008(book_row, record, publication_country, "fin")
         record = self.add_264(book_row, record)
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators)   
@@ -239,8 +244,23 @@ class Bibliografie_record_fin(Bibliografie_record):
             translators, record = self.get_translators_and_other_roles(row['Další role'] , record)  
         else:
             translators = None   
+
+        if pd.isnull(row['Město vydání, země vydání, nakladatel']):
+            publication_country = 'xx-'
+
+        else:
+            publication = row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Finsko':
+                publication_country = 'fi-'
+            elif country == 'Česká republika':
+                publication_country = 'xr-'    
+            else:
+                publication_country = 'xx-' 
         
-        record = self.add_008(row, record) 
+        record = self.add_008(row, record,publication_country, "fin") 
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators) 
         record = self.add_773(record, row)

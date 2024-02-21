@@ -14,39 +14,6 @@ class Bibliografie_record_ita(Bibliografie_record):
         self.italian_articles =  ['il', 'lo', 'la', 'gli', 'le', 'i', 'un', 'una', 'uno', 'dei', 'degli', 'delle']
         self.tag = 'it22'
     
-    def add_008(self, row, record):
-        """Creates fixed length data and adds them to field 008 """ 
-        date_record_creation = str(datetime.today().strftime('%y%m%d'))
-        letter = 's'
-
-        if pd.isnull(row['Rok']):
-            publication_date = '--------'
-        else:
-            publication_date = str(int(row['Rok']))+ '----' 
-
-        if pd.isnull(row['Město vydání, země vydání, nakladatel']):
-            publication_country = 'xx-'
-
-        else:
-            publication = row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if country == 'Itálie':
-                publication_country = 'it-'
-            elif country == 'Česká republika':
-                publication_country = 'xr-'    
-            else:
-                publication_country = 'xx-'
-
-        material_specific =  '-----------------'
-        language = 'ita'
-        modified = '-'
-        cataloging_source = 'd'
-        data = date_record_creation + letter + publication_date +  publication_country + material_specific + language + modified + cataloging_source
-        record.add_ordered_field(Field(tag='008', indicators = [' ', ' '], data = data))
-        return record
-        
        
     def add_245(self,row, liability, title, subtitle, author, translators,  record):
         """Adds data to subfield 245. 
@@ -114,7 +81,19 @@ class Bibliografie_record_ita(Bibliografie_record):
         author = tup[0]
         code = tup[1]
         translators = row['Překladatel/ka']
-        record = self.add_008(row, record)
+
+        if pd.isnull(row['Město vydání, země vydání, nakladatel']):publication_country = 'xx-'
+
+        else:
+            publication = row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Itálie': publication_country = 'it-'
+            elif country == 'Česká republika':publication_country = 'xr-'    
+            else: publication_country = 'xx-'
+
+        record = self.add_008(row, record, publication_country, "ita")
         record = self.add_commmon(row, record, author, code, translators)  
         record = self.add_common_specific(row, record, author, translators)    
         record = self.add_264(row, record)
@@ -131,19 +110,31 @@ class Bibliografie_record_ita(Bibliografie_record):
         record.leader = '-----naa---------4i-4500'  
         ind = int(row['Je součást čeho (číslo záznamu)'])
         book_row = df.loc[df['Číslo záznamu'] == ind]
+        # from Dataframe to Pandas Series
+        book_row = book_row.squeeze()
         # is the author same as in the collective work, or does the book has it's own author 
         if pd.isnull(row['Autor/ka + kód autority']):
-            tup, record = self.add_author_code(book_row['Autor/ka + kód autority'].values[0], record)
+            tup, record = self.add_author_code(book_row['Autor/ka + kód autority'], record)
             author = tup[0] 
             code = tup[1]
         else:
             tup, record = self.add_author_code(row['Autor/ka + kód autority'], record)
             author = tup[0] 
             code = tup[1]    
-        translators = book_row['Překladatel/ka'].values[0]
-        # from Dataframe to Pandas Series
-        book_row = book_row.squeeze()
-        record = self.add_008(book_row, record)
+        translators = book_row['Překladatel/ka']
+
+        if pd.isnull(book_row['Město vydání, země vydání, nakladatel']): publication_country = 'xx-'
+
+        else:
+            publication = book_row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Itálie': publication_country = 'it-'
+            elif country == 'Česká republika': publication_country = 'xr-'    
+            else: publication_country = 'xx-'
+        
+        record = self.add_008(book_row, record, publication_country, "ita")
         record = self.add_264(book_row, record)
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators)   
@@ -161,7 +152,20 @@ class Bibliografie_record_ita(Bibliografie_record):
         author = tup[0]
         code = tup[1]
         translators = row['Překladatel/ka']
-        record = self.add_008(row, record) 
+
+        if pd.isnull(row['Město vydání, země vydání, nakladatel']):
+            publication_country = 'xx-'
+
+        else:
+            publication = row['Město vydání, země vydání, nakladatel'] 
+            start = publication.find('(')+1
+            end = publication.find(')') 
+            country = publication[start:end]
+            if country == 'Itálie': publication_country = 'it-'
+            elif country == 'Česká republika': publication_country = 'xr-'    
+            else: publication_country = 'xx-'
+
+        record = self.add_008(row, record, publication_country, "ita") 
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators) 
         record = self.add_773(record, row)
