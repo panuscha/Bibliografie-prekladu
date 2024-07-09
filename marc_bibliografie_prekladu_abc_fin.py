@@ -98,18 +98,21 @@ class Bibliografie_record_fin(Bibliografie_record):
         """
                 # matches first word in string
         skip = '0'
+        b = '' ## subfield b was originally a subtitle
         c = ''
+        if not pd.isnull(row["Doplnění názvu"]):
+            b = row["Doplnění názvu"]
         if not pd.isnull(row['Údaje o odpovědnosti a další informace (z titulní strany)']):
             c = row['Údaje o odpovědnosti a další informace (z titulní strany)']      # Údaje o odpovědnosti a další informace
         title = title.strip()      
-        if subtitle == '' and c == '':                                                                          
-            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + "."), ]))                                                                          
+        if b == '' and c == '' :                                                                           
+            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " /"), ]))                                                                          
         else:
             if c == '':
-                subtitle = subtitle.strip()
+                #subtitle = subtitle.strip()
                 record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= title + "."),]))
-            elif subtitle == '':  
+                                                                                        Subfield(code='b', value= b + " /"),]))
+            elif b == '':  
                 c = c.strip()    
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " /"),
                                                                                                 Subfield(code='c', value= c)]))
@@ -117,7 +120,7 @@ class Bibliografie_record_fin(Bibliografie_record):
                 subtitle = subtitle.strip()
                 c = c.strip() 
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= title + " /"),
+                                                                                        Subfield(code='b', value= b + " /"),
                                                                                         Subfield(code='c', value= c)]))
         return record        
                 
@@ -168,9 +171,11 @@ class Bibliografie_record_fin(Bibliografie_record):
                 publication_country = 'xx-'      
           
         record = self.add_008(row, record, publication_country, "fin")
+        record = self.add_041(row, record)
         record = self.add_commmon(row, record, author, code, translators)  
         record = self.add_common_specific(row, record, author, translators)    
         record = self.add_264(row, record)
+        
         #if row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] == 'souborné dílo':
         self.add_994_book(row, df, record)   
 
@@ -223,6 +228,7 @@ class Bibliografie_record_fin(Bibliografie_record):
             
         
         record = self.add_008(book_row, record, publication_country, "fin")
+        record = self.add_041(book_row, record)
         record = self.add_264(book_row, record)
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators)   
@@ -261,6 +267,7 @@ class Bibliografie_record_fin(Bibliografie_record):
                 publication_country = 'xx-' 
         
         record = self.add_008(row, record,publication_country, "fin") 
+        record = self.add_041(row, record)
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators) 
         record = self.add_773(record, row)
@@ -323,16 +330,16 @@ if __name__ == "__main__":
             print(year)
             
             # find duplicate rows in clb_trl database
-            df_dup_record = bib_fin.clb_trl[(bib_fin.clb_trl['title_trl'] == title) & (bib_fin.clb_trl['author_code'] == author_code) & (bib_fin.clb_trl['pub_year'] == year)]
+            #df_dup_record = bib_fin.clb_trl[(bib_fin.clb_trl['title_trl'] == title) & (bib_fin.clb_trl['author_code'] == author_code) & (bib_fin.clb_trl['pub_year'] == year)]
             
-            if df_dup_record.empty:
+            if True: # df_dup_record.empty: ### CHECK DUPLICATES
                 if 'kniha' or 'antologie' in row['Typ záznamu']: 
                     record = bib_fin.create_record_book(row, df)
                 if 'část knihy' in row['Typ záznamu']: 
                     record = bib_fin.create_record_part_of_book(row, df)
                 if 'článek v časopise' in row['Typ záznamu']:
                     record = bib_fin.create_article(row)
-                print(record)    
+                #print(record)    
                 writer.write(record.as_marc())
             else: 
                 matching_row = df_dup_record.iloc[0]
