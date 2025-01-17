@@ -10,8 +10,8 @@ import pickle
 
 
 class Bibliografie_record_gre(Bibliografie_record):
-    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers):
-        super(Bibliografie_record_gre, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers)
+    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path):
+        super(Bibliografie_record_gre, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path)
         self.greek_articles =  ['ένα', 'έναν', 'ένας', 'ενός','η','μια','μια(ν)','μιας','ο','οι', 'τα','τη(ν)','της','τις','το','τον','του','τους','των']  ## TODO: ADD GREEK ARTICLES
         self.tag = 'gr23' 
         
@@ -128,7 +128,9 @@ class Bibliografie_record_gre(Bibliografie_record):
         return record        
 
     def add_880(self, row, record):
-        "název díla v původním písmu - 245, nakladatel v pův. písmu - 264, název edice - 490, další role - 700, název časopisu - 773 "
+        """links latin and greek script together
+        název díla v původním písmu - 245, nakladatel v pův. písmu - 264, název edice - 490, další role - 700, název časopisu - 773 
+        """
         fields_codes = {'245': 'Název díla v původním písmu', 
                         '264': 'Nakadatel v původním písmu', 
                         '490': 'Název edice v původním písmu',
@@ -220,8 +222,8 @@ class Bibliografie_record_gre(Bibliografie_record):
         else:
             translators = None    
 
-        if not pd.isnull(book_row['Edice, svazek'].values[0]):    
-            record = self.add_490(book_row['Edice, svazek'].values[0], record)    
+        if not pd.isnull(book_row['Edice, svazek']):    
+            record = self.add_490(book_row['Edice, svazek'], record)    
 
         if pd.isnull(book_row['Město vydání, země vydání, nakladatel']):
             publication_country = 'xx-'
@@ -231,16 +233,13 @@ class Bibliografie_record_gre(Bibliografie_record):
             start = publication.find('(')+1
             end = publication.find(')') 
             country = publication[start:end]
-            if country == 'Česká republika':
-                publication_country = 'xr-'
-            elif country == 'Řecko':
-                publication_country = 'gr-'    ## GREECE - > GR ????      
-            else:
-                publication_country = 'xx-'    
-            
+            if 'Česk' in country: publication_country = 'xr-'
+            elif country == 'Řecko': publication_country = 'gr-'    ## GREECE - > GR ????     
+            elif country == 'Itálie': publication_country = 'it-'  
+            else: publication_country = 'xx-'    
         
-        record = self.add_041(book_row, record, publication_country, "gre")   
-        record = self.add_008(book_row, record)
+        record = self.add_008(book_row, record, publication_country, "gre")      
+        record = self.add_041(book_row, record) 
         record = self.add_264(book_row, record)
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators)    
@@ -347,7 +346,7 @@ class Bibliografie_record_gre(Bibliografie_record):
 
 if __name__ == "__main__":
     
-        # file with all czech translations and their id's 
+    # file with all czech translations and their id's 
     czech_translations="data/czech_translations_full_18_01_2022.mrc" # obohacovat o kody 595
     # list of identifiers
     identifiers = []
@@ -378,7 +377,7 @@ if __name__ == "__main__":
                     print(row['Číslo záznamu'])
                     print(row['Typ záznamu'])
                     bib_gre = Bibliografie_record_gre(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
-                                                      dict_author__code_work_path = dict_author__code_work_path, identifiers=identifiers)
+                                                      dict_author__code_work_path = dict_author__code_work_path)
                     if 'kniha' in row['Typ záznamu']: 
                         record = bib_gre.create_record_book(row, df)
                     if 'část knihy' in row['Typ záznamu']: 
@@ -387,6 +386,8 @@ if __name__ == "__main__":
                         record = bib_gre.create_article(row)
                     print(record)
                     dict_author_work = bib_gre.dict_author_work
+                    pickle.dump( bib_gre.dict_author_work, open( "data/dict_author_work.obj", "wb" ) )
+                    pickle.dump( bib_gre.dict_author_code_work, open( "data/dict_author_code_work.obj", "wb" ) )
                     writer.write(record.as_marc())
             except :
                 err.append(row['Číslo záznamu'])

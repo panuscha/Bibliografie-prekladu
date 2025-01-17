@@ -1,16 +1,14 @@
 from marc_bibliografie_prekladu_abc import Bibliografie_record
-from abc import ABC, abstractmethod 
-from pymarc import Record, MARCReader, Subfield
+from pymarc import Record, Subfield
 import pandas as pd
 from pymarc.field import Field
-from datetime import datetime
 import re
-import random
+import pickle
 
 class Bibliografie_record_ita(Bibliografie_record): 
     
-    def __init__(self, finalauthority_path, dict_author_work,dict_author__code_work_path, identifiers):
-        super(Bibliografie_record_ita, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers)
+    def __init__(self, finalauthority_path, dict_author_work,dict_author__code_work_path):
+        super(Bibliografie_record_ita, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path)
         self.italian_articles =  ['il', 'lo', 'la', 'gli', 'le', 'i', 'un', 'una', 'uno', 'dei', 'degli', 'delle']
         self.tag = 'it22'
     
@@ -42,7 +40,7 @@ class Bibliografie_record_ita(Bibliografie_record):
             if c == '':
                 subtitle = subtitle.strip()
                 record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= title + " ."),]))
+                                                                                        Subfield(code='b', value= subtitle + " ."),]))
             elif subtitle == '':  
                 c = c.strip()    
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " /"),
@@ -51,7 +49,7 @@ class Bibliografie_record_ita(Bibliografie_record):
                 subtitle = subtitle.strip()
                 c = c.strip() 
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= title + " /"),
+                                                                                        Subfield(code='b', value= subtitle + " /"),
                                                                                         Subfield(code='c', value= c)]))
         return record        
                 
@@ -175,19 +173,18 @@ if __name__ == "__main__":
     
         # file with all czech translations and their id's 
     czech_translations="data/czech_translations_full_18_01_2022.mrc"
-    # list of identifiers
-    identifiers = []
 
     dict_author_work_path = "data/dict_author_work.obj"
 
     dict_author__code_work_path =  "data/dict_author_code_work.obj"
     # initial table 
-    IN = 'data/preklady/Bibliografie_prekladu_it.csv'
+    IN = 'data/preklady/Bibliografie_prekladu_ita.csv'
     # final file
-    OUT = 'data/marc_it.mrc'
+    OUT = 'data/marc_ita.mrc'
 
     df = pd.read_csv(IN, encoding='utf_8')
 
+    err = [] 
     # table with authority codes
     finalauthority_path = 'data/finalauthority_simple.csv'
 
@@ -195,17 +192,23 @@ if __name__ == "__main__":
     with open(OUT , 'wb') as writer:
         #iterates all rows in the table
         for index, row in df.iterrows():
-            print(row['Číslo záznamu'])
-            bib_ita = Bibliografie_record_ita(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
-                                              dict_author__code_work_path = dict_author__code_work_path, identifiers=identifiers)
-            if 'kniha' in row['Typ záznamu']: 
-                record = bib_ita.create_record_book(row, df)
-            if 'část knihy' in row['Typ záznamu']: 
-                record = bib_ita.create_record_part_of_book(row, df)
-            if 'článek v časopise' in row['Typ záznamu']:
-                record = bib_ita.create_article(row)
-            print(record)    
-            writer.write(record.as_marc())
+            try:            
+                print(row['Číslo záznamu'])
+                bib_ita = Bibliografie_record_ita(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
+                                                    dict_author__code_work_path = dict_author__code_work_path)
+                if 'kniha' in row['Typ záznamu']: 
+                    record = bib_ita.create_record_book(row, df)
+                if 'část knihy' in row['Typ záznamu']: 
+                    record = bib_ita.create_record_part_of_book(row, df)
+                if 'článek v časopise' in row['Typ záznamu']:
+                    record = bib_ita.create_article(row)
+                print(record)    
+                writer.write(record.as_marc())
+                pickle.dump( bib_ita.dict_author_work, open( "data/dict_author_work.obj", "wb" ) )
+                pickle.dump( bib_ita.dict_author_code_work, open( "data/dict_author_code_work.obj", "wb" ) )
+            except :
+                err.append(row['Číslo záznamu'])
+    print(err)            
     writer.close()
 
     

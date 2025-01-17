@@ -93,7 +93,7 @@ def create_dict_author_work_excel(path, author_column):
             else:
                 dict_author_work[author.lower()] = {work.lower() : id } 
 
-    return dict_author_work   
+    return dict_author_work, identifiers   
 
    
 
@@ -169,14 +169,7 @@ def load_df_csv(path):
                               
 
 
-if __name__ == "__main__":
-    # df_dict = import_czech_fennica("data/fennica_preklady.mrc")
-    # df = pd.DataFrame(df_dict).T
-    # pickle.dump( df, open( "data/fennica_czech.obj", "wb" ) )
-    # lang = 'fin'
-    # df_dict = import_bib_translations("data/ucla_trl.mrc", lang)
-    # df = pd.DataFrame(df_dict)
-    # pickle.dump( df, open( "data/clb_trl_{lang}.obj".format(lang =lang), "wb" ) )
-    # print(df)
-    dict_author_code_work = create_dict_author_work_excel("data/work-database_archive.xlsx", 'autor')
-    pickle.dump( dict_author_code_work, open( "data/dict_author_work.obj", "wb" ) )
+# if __name__ == "__main__":
+#     dict_author_code_work, identifiers = create_dict_author_work_excel("data/work-database_archive.xlsx", 'autor')
+#     pickle.dump( dict_author_code_work, open( "data/dict_author_work.obj", "wb" ) )
+#     pickle.dump( identifiers, open( "data/identifiers.obj", "wb" ) )

@@ -1,18 +1,15 @@
 from marc_bibliografie_prekladu_abc import Bibliografie_record
-from abc import ABC, abstractmethod 
-from pymarc import Record, MARCReader, Subfield
+from pymarc import Record, Subfield
 import pandas as pd
 from pymarc.field import Field
-from datetime import datetime
 import re
-import random
 import pickle
 import marc_extra_codes
 
 class Bibliografie_record_fin(Bibliografie_record): 
     
-    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers, fennica_path, clb_trl_path):
-        super(Bibliografie_record_fin, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, identifiers)
+    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path, fennica_path, clb_trl_path):
+        super(Bibliografie_record_fin, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path)
         self.tag = "fi24"
         self.df_fennica = pickle.load(open(fennica_path, "rb" ))
         self.clb_trl = pickle.load(open(clb_trl_path, "rb" ))
@@ -106,12 +103,12 @@ class Bibliografie_record_fin(Bibliografie_record):
             c = row['Údaje o odpovědnosti a další informace (z titulní strany)']      # Údaje o odpovědnosti a další informace
         title = title.strip()      
         if b == '' and c == '' :                                                                           
-            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " /"), ]))                                                                          
+            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " ." ), ]))    # TODO - should this end with '/' ???     + " /"                                                                 
         else:
             if c == '':
                 #subtitle = subtitle.strip()
                 record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= b + " /"),]))
+                                                                                        Subfield(code='b', value= b + " ."),])) # TODO - should this end with '/' ???     + " /" 
             elif b == '':  
                 c = c.strip()    
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " /"),
@@ -291,8 +288,6 @@ if __name__ == "__main__":
     
     # file with all czech translations and their id's 
     czech_translations="data/czech_translations_full_18_01_2022.mrc"
-    # list of identifiers
-    identifiers = []
 
     # initial table 
     IN = 'data/preklady/Bibliografie_prekladu_fin.csv'
@@ -318,9 +313,10 @@ if __name__ == "__main__":
     with open(OUT , 'wb') as writer:
         #iterates all rows in the table
         for index, row in df.iterrows():
+
             print(row['Číslo záznamu'])
             bib_fin = Bibliografie_record_fin(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
-                                              dict_author__code_work_path =  dict_author__code_work_path, identifiers=identifiers, \
+                                              dict_author__code_work_path =  dict_author__code_work_path, \
                                               fennica_path="data/fennica_czech.obj", clb_trl_path="data/clb_trl_fin.obj")
             title = row['Název díla dle titulu v latince']
             (author_name,author_code), _  = bib_fin.add_author_code(row['Autor/ka + kód autority'], Record(to_unicode=True,
@@ -341,17 +337,6 @@ if __name__ == "__main__":
                     record = bib_fin.create_article(row)
                 #print(record)    
                 writer.write(record.as_marc())
-            else: 
-                matching_row = df_dup_record.iloc[0]
-                if matching_row['finished']:
-                    duplications_finished.append({author_name:[title, year]})
-                    dup_count_fin += 1
-                    found_records.append(df_dup_record)
-                else:
-                    duplications_unfinished.append({author_name:title})
-                    dup_count_unfin += 1    
-    # print(dup_count_fin)
-    # print( duplications_finished)  
-    # print(dup_count_unfin)
-    # print(duplications_unfinished)                
+                pickle.dump( bib_fin.dict_author_work, open( "data/dict_author_work.obj", "wb" ) )
+                pickle.dump( bib_fin.dict_author_code_work, open( "data/dict_author_code_work.obj", "wb" ) )              
     writer.close()

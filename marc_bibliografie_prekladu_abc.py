@@ -6,16 +6,16 @@ from datetime import datetime
 import re
 import random
 import pickle
+from deepdiff import DeepDiff
 
 
 class Bibliografie_record(ABC): 
 
-    def __init__(self, finalauthority_path, dict_author_work_path,dict_author_code_work_path, identifiers, **kwargs):
+    def __init__(self, finalauthority_path, dict_author_work_path,dict_author_code_work_path,  **kwargs):
         self.finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
         self.finalauthority.index= self.finalauthority['nkc_id']
         self.dict_author_work = pickle.load(open(dict_author_work_path, "rb" ))
         self.dict_author_code_work = pickle.load(open(dict_author_code_work_path, "rb" ))
-        self.identifiers = identifiers 
         self.ordinal = ['první', 'druhé', 'třetí', 'čtvrté', 'páté','šesté', 'sedmé', 'osmé', 'deváté', 'desáté', 'jedenácté', 'dvanácté', 'třinácté', 'čtrnácté', 'patnácté']
     
     @abstractmethod
@@ -82,9 +82,8 @@ class Bibliografie_record(ABC):
         rand_number = str(random.randint(lowest,highest))
         ret = "ubc"+code[0:4]+str(code[-2:])+"-"+rand_number
         # in case generated id already exists, create a new one
-        while ret in self.identifiers:
-            rand_number = str(random.randint(lowest,highest))
-            ret = "ubc"+code[0:4]+str(code[-2:])+"-"+rand_number
+        rand_number = str(random.randint(lowest,highest))
+        ret = "ubc"+code[0:4]+str(code[-2:])+"-"+rand_number    
         return ret  
     
     def add_041(self, row, record):
@@ -116,8 +115,11 @@ class Bibliografie_record(ABC):
         """Adds data to field 595. 
         Consists of author's name in subfield 'a', birth (and death) year in subfield 'd'
         author's code in subfield '7', original title of the work in subfield 't' and generated id in subfield 't'""" 
-        original_work_title = str(row['Původní název']).strip()    
-        if pd.isnull(original_work_title) or ("originál neznámý" in original_work_title.lower())  or ("originál neexistuje" in original_work_title.lower()):
+        original_work_title_orig = str(row['Původní název']).strip()
+        original_work_title = original_work_title_orig.lower()
+        author_orig = author
+        if author is not None : author = author.lower()  
+        if pd.isnull(original_work_title) or ('originál nenalezen' in original_work_title) or ("originál neznámý" in original_work_title)  or ("originál neexistuje" in original_work_title):
             original_work_title = None                                                                      
         if author is not None:
             if not code is None:
@@ -127,48 +129,45 @@ class Bibliografie_record(ABC):
                     date = None        
             else:
                 date = None            
-                id = self.generate_id(code)
+                id = None #self.generate_id(code) <-- we cannot associate id with code 
+            
             if not code in self.dict_author_code_work.keys():
                 if original_work_title is None:
                     id = None  
-                elif not author.lower() in self.dict_author_work.keys():
-                    if original_work_title is None:
-                        id = None  
-                    else:
-                        id = self.generate_id(code)          
+                elif not author in self.dict_author_work.keys():
+                    id = self.generate_id(code)   
+                    self.dict_author_work[author] = {original_work_title:id}   
+                    self.dict_author_code_work[code] = {original_work_title:id}      
                 else:
-                    dict_titles = self.dict_author_work[author.lower()]
-                    if original_work_title is not None and original_work_title.lower() in dict_titles.keys():
-                        id = dict_titles[original_work_title.lower()]
+                    dict_titles = self.dict_author_work[author]
+                    if original_work_title in dict_titles.keys():
+                        id = dict_titles[original_work_title]
                     else:
-                        if original_work_title is None:
-                            id = None  
-                        else:
-                            id = self.generate_id(code) 
-                            dict_titles[original_work_title] = id
-                            self.dict_author_work[author.lower()] = dict_titles
+                        id = self.generate_id(code) 
+                        dict_titles[original_work_title] = id
+                        self.dict_author_work[author] = dict_titles
+                        self.dict_author_code_work[code] = {original_work_title:id}
             else:
                 dict_titles = self.dict_author_code_work[code]
-                if original_work_title is not None and original_work_title.lower() in dict_titles.keys():
-                    id = dict_titles[original_work_title.lower()]
+                if original_work_title is not None and original_work_title in dict_titles.keys():
+                    id = dict_titles[original_work_title]
                 else:
                     if original_work_title is None:
                         id = None  
                     else:
                         id = self.generate_id(code) 
-                        dict_titles[original_work_title] = id
+                        dict_titles[original_work_title.lower()] = id
                         self.dict_author_code_work[code] = dict_titles                
 
-            record.add_ordered_field(Field(tag='595', indicators = ['1', '2'], subfields = [Subfield(code='a', value=author)  ]))
+            record.add_ordered_field(Field(tag='595', indicators = ['1', '2'], subfields = [Subfield(code='a', value=author_orig)  ]))
             if date is not None: 
                 record['595'].add_subfield(code = 'd', value=date)
             if code is not None: 
                 record['595'].add_subfield(code = '7', value=str(code))       
-            if original_work_title is not None:     
-                record['595'].add_subfield(code = 't', value=original_work_title)
+            if original_work_title_orig is not None and original_work_title_orig != '':     
+                record['595'].add_subfield(code = 't', value=original_work_title_orig)
             if id is not None:
-                record['595'].add_subfield(code = '1', value=id)   
-            # TODO: find out if this is correct  - two 595 fields                 
+                record['595'].add_subfield(code = '1', value=id)                   
             if not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
                 record['595'].add_subfield(code='i', value= row['Údaje o zprostředkovacím díle'].strip())
         elif not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
@@ -183,7 +182,7 @@ class Bibliografie_record(ABC):
         if pd.isnull(row['Rok']):
             publication_date = '--------'
         else:
-            publication_date = str(int(row['Rok']))+ '----' 
+            publication_date = str(row['Rok']).replace('.0','')+ '----' 
 
         material_specific =  '-----------------'
         modified = '-'
@@ -206,10 +205,12 @@ class Bibliografie_record(ABC):
         if comma:
             magazine = comma.group(1).strip()  # Extract and strip leading/trailing whitespace
             rest = comma.group(2).strip() 
-            year = str(int(row['Rok']))
-            record.add_ordered_field(Field(tag='773', indicators = ['0', ' '], subfields = [Subfield(code='t', value=magazine),
-                                                                                            Subfield(code='g', value=rest),
-                                                                                            Subfield(code='9', value=year) ]))
+            
+            subfields = [Subfield(code='t', value=magazine),
+                        Subfield(code='g', value=rest)]
+            year = row['Rok']
+            if not pd.isnull(year): subfields += [Subfield(code='9', value= str(year).replace('.0',''))]
+            record.add_ordered_field(Field(tag='773', indicators = ['0', ' '], subfields =  subfields))
         return record    
                                                                         
 
@@ -255,7 +256,7 @@ class Bibliografie_record(ABC):
             subtitle = subtitle.strip()      
             return(title, subtitle)   
 
-    def add_264(self, row, record):
+    def add_264(self, row, record): ## TODO: WHAT TO DO WHEN 2 PUBLISHERS??
         """Adds data to subfield 264. 
         Consists of city of publication, coutry of publications and the publisher
         """
@@ -273,35 +274,33 @@ class Bibliografie_record(ABC):
                 else:  
                     # matches first words in string   
                     city =  re.search('^[\w\s]+', element).group(0).strip()
-                    
-
-                publisher = re.search('(?<=\:\s).+', element)
-                # if str(row['Rok']).isnumeric(): 
-                #     year = str(int(row['Rok']))
-                # else:
-                #     if '.0' in str(row['Rok']):
-                #         year = str(float(row['Rok'])).rstrip("0").rstrip(".")
-                #     else:
-                #         year = row['Rok']    
-
-                year = row['Rok']   
- 
-                if publisher:
-                    publisher = publisher.group(0).strip()          
-                    record.add_ordered_field(Field(tag = '264', indicators = [' ', '1'], subfields = [Subfield(code='a', value= city + ':'),
-                                                                                        Subfield(code='b', value=publisher+ ','),
-                                                                                        Subfield(code='c', value=str(year))]))
             else:
-                city = "[s. l.]"
-                publisher = re.search('(?<=\:\s).+', element)
-                if publisher:
-                    publisher = publisher.group(0).strip() 
-                    year = row['Rok'] 
-                    # Only the name of publisher is known 
-                    record.add_ordered_field(Field(tag = '264', indicators = [' ', '1'], subfields = [Subfield(code='a', value= city + ':'),
-                                                                                                  Subfield(code='b', value=publisher + ','),
-                                                                                                  Subfield(code='c', value=str(year))])) 
+                city = "[s. l.]"        
+            publisher = re.search('(?<=\:\s).+', element)
+            year = row['Rok']   
 
+            subfield_publisher = []
+ 
+            if publisher:
+                publisher = publisher.group(0).strip()   
+                subfield_publisher = [Subfield(code='a', value= city + ':') ]
+                subfield_publisher += [Subfield(code='b', value=publisher + ','), Subfield(code='c', value=str(year).replace('.0',''))]  if not pd.isnull(year) else [Subfield(code='b', value=publisher)]
+                    
+            else:      # no publisher is named
+                subfield_publisher += [Subfield(code='a', value= city + ','), Subfield(code='c', value=str(year).replace('.0',''))]  if not pd.isnull(year) else [Subfield(code='a', value= city )]
+
+           
+                # publisher = re.search('(?<=\:\s).+', element)
+                # if publisher:
+                #     publisher = publisher.group(0).strip() 
+                #     year = row['Rok'] 
+                #     # Only the name of publisher is known 
+                #     subfield_publisher = [Subfield(code='a', value= city + ':'),
+                #                       Subfield(code='b', value=publisher+ ',')]
+                #     if not pd.isnull(year): subfield_publisher += [Subfield(code='c', value=str(year))]
+                # else:     # no publisher is named
+                #     subfield_publisher += [Subfield(code='a', value= city + ','), Subfield(code='c', value=str(year))]  if not pd.isnull(year) else [Subfield(code='a', value= city )]    
+            record.add_ordered_field(Field(tag = '264', indicators = [' ', '1'], subfields = subfield_publisher))
         return record            
 
 
@@ -409,6 +408,9 @@ class Bibliografie_record(ABC):
                 record.add_ordered_field(Field(tag = '250', indicators=[' ', ' '], subfields=[Subfield(code='a', value= row['Volná poznámka']) ]))
             else:     
                 record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= row['Volná poznámka']) ]))
+
+        if not(pd.isnull(row['technická poznámka'])):   
+            record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= row['technická poznámka']) ]))     
         
         record = self.add_595(record, row, author, code)  
         
