@@ -138,33 +138,51 @@ def import_bib_translations(path, lang):
     print(count)
     return df_dict   
 
-def load_df_csv(path): 
+def load_df_csv(path, language): 
     df = pd.read_csv(path, encoding='utf_8')       
-    df["Číslo záznamu"] = df["Číslo záznamu"].apply(lambda x: int(x) if not(pd.isnull(x)) else np.nan)
-    df["Finské id"] = df["Finské id"].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Typ záznamu'] = df['Typ záznamu'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Je součást čeho (číslo záznamu)'] = df['Je součást čeho (číslo záznamu)'].apply(lambda x: int(x) if not(pd.isnull(x)) else np.nan) #and str(x).isnumeric()
-    df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] = df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Vztah k originálu (překlad vs. adaptace)'] = df['Vztah k originálu (překlad vs. adaptace)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Druh adaptace (slovem)'] = df['Druh adaptace (slovem)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Autor/ka + kód autority'] = df['Autor/ka + kód autority'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Název díla dle titulu v latince'] = df['Název díla dle titulu v latince'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else np.nan) 
-    df['Údaje o odpovědnosti a další informace (z titulní strany)'] = df['Údaje o odpovědnosti a další informace (z titulní strany)'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else np.nan) 
-    df['Původní název'] = df['Původní název'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Jazyk díla'] = df['Jazyk díla'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Výchozí jazyk '] = df['Výchozí jazyk '].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan )
-    df['Zprostředkovací jazyk'] = df['Zprostředkovací jazyk'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Údaje o zprostředkovacím díle'] = df['Údaje o zprostředkovacím díle'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Město vydání, země vydání, nakladatel'] = df['Město vydání, země vydání, nakladatel'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df['Edice, svazek'] = df['Edice, svazek'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan )
-    df['Údaje o časopiseckém vydání'] = df['Údaje o časopiseckém vydání'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)
-    df["Počet stran"] = df["Počet stran"].apply(lambda x: str(int(x)) if not(pd.isnull(x)) else np.nan)
-    df["Rok"] = df["Rok"].apply(lambda x: str(int(x)) if not(pd.isnull(x)) else np.NaN)
-    df['ISBN'] = df['ISBN'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan) 
-    df['Další role'] = df['Další role'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)   
-    df['Volná poznámka'] = df['Volná poznámka'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)  
-    df['technická poznámka'] = df['technická poznámka'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else np.nan)  
+    #df["Číslo záznamu"] = df["Číslo záznamu"].apply(lambda x: int(x) if not(pd.isnull(x)) else np.nan)
+    df["Číslo záznamu"] = df["Číslo záznamu"].apply(lambda x: int(x) if not pd.isnull(x) else None)
+    df["Číslo záznamu"] = df["Číslo záznamu"].astype("Int64")
+    df['Typ záznamu'] = df['Typ záznamu'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df['Je součást čeho (číslo záznamu)'] = df['Je součást čeho (číslo záznamu)'].apply(lambda x: int(x) if not(pd.isnull(x)) else None) #and str(x).isnumeric()
+    df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] = df['typ díla (celé dílo, úryvek, antologie, souborné dílo)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df['Vztah k originálu (překlad vs. adaptace)'] = df['Vztah k originálu (překlad vs. adaptace)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df['Druh adaptace (slovem)'] = df['Druh adaptace (slovem)'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df['Autor/ka + kód autority'] = df['Autor/ka + kód autority'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df['Původní název'] = df['Původní název'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df['Jazyk díla'] = df['Jazyk díla'].apply(lambda x: str(x).replace(';', ',').replace('§', ',').strip() if not(pd.isnull(x)) else None)
+    df['Výchozí jazyk '] = df['Výchozí jazyk '].apply(lambda x: str(x).replace(';', ',').replace('§', ',').strip() if not(pd.isnull(x)) else None)
+    df['Zprostředkovací jazyk'] = df['Zprostředkovací jazyk'].apply(lambda x: str(x).replace(';', ',').replace('§', ',').strip() if not(pd.isnull(x)) else None)
+    df['Údaje o zprostředkovacím díle'] = df['Údaje o zprostředkovacím díle'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df['Město vydání, země vydání, nakladatel'] = df['Město vydání, země vydání, nakladatel'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df['Edice, svazek'] = df['Edice, svazek'].apply(lambda x: str(x).replace(',', ';').strip() if not(pd.isnull(x)) else None)
+    df['Údaje o časopiseckém vydání'] = df['Údaje o časopiseckém vydání'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+    df["Počet stran"] = df["Počet stran"].apply(lambda x: str(int(x)) if not(pd.isnull(x))  and str(x).isnumeric() else None)
+    df["Rok"] = df["Rok"].apply(lambda x: str(x).replace('.0','')if not(pd.isnull(x)) else None)
+    df['ISBN'] = df['ISBN'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None) 
+    df['Volná poznámka'] = df['Volná poznámka'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)  
+    df['technická poznámka'] = df['technická poznámka'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)  
+
+    if language == 'fin': 
+        df["Finské id"] = df["Finské id"].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+        df['Název díla dle titulu v latince'] = df['Název díla dle titulu v latince'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else None) 
+        df['Údaje o odpovědnosti a další informace (z titulní strany)'] = df['Údaje o odpovědnosti a další informace (z titulní strany)'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else None)
+        df['Další role'] = df['Další role'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None) 
+
+    if language == 'gre': 
+        df['Název díla dle titulu v latince'] = df['Název díla dle titulu v latince'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else None) 
+        df['Údaje o odpovědnosti a další informace (z titulní strany)'] = df['Údaje o odpovědnosti a další informace (z titulní strany)'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else None)
+        df['Další role'] = df['Další role'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None) 
+
+    if language == 'ita':
+        df['Název díla dle titulu (v příslušném písmu)'] = df['Název díla dle titulu (v příslušném písmu)'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else None) 
+        df['Údaje o odpovědnosti a další informace'] = df['Údaje o odpovědnosti a další informace'].apply(lambda x: str(x).strip()if not(pd.isnull(x)) else None)
+        df['Překladatel/ka'] = df['Překladatel/ka'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None)
+        df['Zdroj či odkaz'] = df['Zdroj či odkaz'].apply(lambda x: str(x).strip() if not(pd.isnull(x)) else None) 
+    
     return df
+
+
 
                               
 

@@ -16,7 +16,7 @@ class Bibliografie_record(ABC):
         self.finalauthority.index= self.finalauthority['nkc_id']
         self.dict_author_work = pickle.load(open(dict_author_work_path, "rb" ))
         self.dict_author_code_work = pickle.load(open(dict_author_code_work_path, "rb" ))
-        self.ordinal = ['první', 'druhé', 'třetí', 'čtvrté', 'páté','šesté', 'sedmé', 'osmé', 'deváté', 'desáté', 'jedenácté', 'dvanácté', 'třinácté', 'čtrnácté', 'patnácté']
+        self.ordinal = ['první', 'druhé', 'třetí', 'čtvrté', 'páté','šesté', 'sedmé', 'osmé', 'deváté', 'desáté', 'jedenácté', 'dvanácté', 'třinácté', 'čtrnácté', 'patnácté', '1.', '2.', '3.', '4.', '5.', '6.']
     
     @abstractmethod
     def add_008(self,row, record, lang):
@@ -37,11 +37,6 @@ class Bibliografie_record(ABC):
     @abstractmethod   
     def add_994_book(self, row, df, record):
         """Adds id's of all parts of the collective work to field 994."""
-        pass
-
-    @abstractmethod   
-    def add_994_part_of_book(self, row, record):
-        """Adds id of the collective work to field 994."""
         pass
         
     @abstractmethod    
@@ -93,19 +88,17 @@ class Bibliografie_record(ABC):
         mediator = row['Zprostředkovací jazyk']
         
         if not pd.isnull(work_lang) and work_lang != 'nan': 
-            work_lang = work_lang.replace(';', ',').strip()
-            for w_l in work_lang.split(','):                                        
-                record.add_ordered_field(Field(tag='041', indicators=['1',' '],subfields=[Subfield(code='a', value= w_l.strip() )])) 
+            #for w_l in work_lang.split(','):                                        
+                #record.add_ordered_field(Field(tag='041', indicators=['1',' '],subfields=[Subfield(code='a', value= w_l.strip() )])) 
+            record.add_ordered_field(Field(tag='041', indicators=['1',' '],subfields = [Subfield(code='a', value= w_l.strip() ) for w_l in work_lang.split(',')] )) 
         
         if not pd.isnull(original_lang):
             if original_lang == 'nan':
-                original_lang = 'cze'
-            original_lang = original_lang.replace(';', ',').strip()    
+                original_lang = 'cze' 
             for o_l in original_lang.split(','):   
                 record['041'].add_subfield('h', o_l.strip())
             
         if not pd.isnull(mediator):
-            mediator = mediator.replace(';', ',').strip()
             for m in mediator.split(','): 
                 record['041'].add_subfield('k', m.strip())
         
@@ -115,7 +108,7 @@ class Bibliografie_record(ABC):
         """Adds data to field 595. 
         Consists of author's name in subfield 'a', birth (and death) year in subfield 'd'
         author's code in subfield '7', original title of the work in subfield 't' and generated id in subfield 't'""" 
-        original_work_title_orig = str(row['Původní název']).strip()
+        original_work_title_orig = str(row['Původní název']).strip() if not pd.isnull(row['Původní název']) else '' # TODO: tohle nějak vyresit
         original_work_title = original_work_title_orig.lower()
         author_orig = author
         if author is not None : author = author.lower()  
@@ -164,7 +157,7 @@ class Bibliografie_record(ABC):
                 record['595'].add_subfield(code = 'd', value=date)
             if code is not None: 
                 record['595'].add_subfield(code = '7', value=str(code))       
-            if original_work_title_orig is not None and original_work_title_orig != '':     
+            if original_work_title_orig is not None and original_work_title_orig != '' and original_work_title_orig != 'nan':     
                 record['595'].add_subfield(code = 't', value=original_work_title_orig)
             if id is not None:
                 record['595'].add_subfield(code = '1', value=id)                   
@@ -219,7 +212,7 @@ class Bibliografie_record(ABC):
         Also returns author's name and code as a tuple.
         """ 
         if not(pd.isnull(data)):
-            for data in data.split('§'):
+            for data in data.split('§'): 
                 start = data.find('(')
                 end = data.find(')') 
                 if start == -1:
@@ -228,15 +221,17 @@ class Bibliografie_record(ABC):
                     return (data, None), record
             
             
+                Subfields = []
                 # matches everything before '(' character 
                 author = re.search('.*(?=\s+\()', data).group(0).strip()
                 code = data[start+1: end].strip()
-                record.add_ordered_field(Field(tag='100', indicators=['1',' '], subfields=[Subfield(code='a', value=author)]))
+                Subfields.append(Subfield(code='a', value=author + ', '))  # comma manual page 42 
                 if code in self.finalauthority.index:
-                        date = str(self.finalauthority.loc[code]['cz_dates' ]) 
-                        record['100'].add_subfield(code = 'd', value=date)
-                record['100'].add_subfield(code = '7', value=code)
-                record['100'].add_subfield(code = '4', value='aut')                             
+                        date = str(self.finalauthority.loc[code]['cz_dates']) 
+                        Subfields.append(Subfield(code = 'd', value=date))
+                Subfields.append(Subfield(code = '7', value=code))
+                Subfields.append(Subfield(code = '4', value='aut'))        
+                record.add_ordered_field(Field(tag='100', indicators=['1',' '], subfields=Subfields))                           
             return (author, code), record
         else:
             return (None, None), record
@@ -262,6 +257,8 @@ class Bibliografie_record(ABC):
         """
         if pd.isnull(row['Město vydání, země vydání, nakladatel']):
             return record    
+        city_dict = {}
+        year = row['Rok'] 
         city_country_publisher = row['Město vydání, země vydání, nakladatel'].strip()
         for element in city_country_publisher.split('§'):
                                     # Matches everything before ( 
@@ -277,29 +274,19 @@ class Bibliografie_record(ABC):
             else:
                 city = "[s. l.]"        
             publisher = re.search('(?<=\:\s).+', element)
-            year = row['Rok']   
+              
 
             subfield_publisher = []
  
             if publisher:
                 publisher = publisher.group(0).strip()   
-                subfield_publisher = [Subfield(code='a', value= city + ':') ]
-                subfield_publisher += [Subfield(code='b', value=publisher + ','), Subfield(code='c', value=str(year).replace('.0',''))]  if not pd.isnull(year) else [Subfield(code='b', value=publisher)]
+                subfield_publisher = [Subfield(code='a', value= city + ' : ') ]
+                subfield_publisher += [Subfield(code='b', value=publisher + ', '), Subfield(code='c', value=str(year).replace('.0',''))]  if not pd.isnull(year) else [Subfield(code='b', value=publisher)]
                     
             else:      # no publisher is named
                 subfield_publisher += [Subfield(code='a', value= city + ','), Subfield(code='c', value=str(year).replace('.0',''))]  if not pd.isnull(year) else [Subfield(code='a', value= city )]
 
-           
-                # publisher = re.search('(?<=\:\s).+', element)
-                # if publisher:
-                #     publisher = publisher.group(0).strip() 
-                #     year = row['Rok'] 
-                #     # Only the name of publisher is known 
-                #     subfield_publisher = [Subfield(code='a', value= city + ':'),
-                #                       Subfield(code='b', value=publisher+ ',')]
-                #     if not pd.isnull(year): subfield_publisher += [Subfield(code='c', value=str(year))]
-                # else:     # no publisher is named
-                #     subfield_publisher += [Subfield(code='a', value= city + ','), Subfield(code='c', value=str(year))]  if not pd.isnull(year) else [Subfield(code='a', value= city )]    
+   
             record.add_ordered_field(Field(tag = '264', indicators = [' ', '1'], subfields = subfield_publisher))
         return record            
 
@@ -363,6 +350,23 @@ class Bibliografie_record(ABC):
         if not pd.isnull(liability):
             c += ' ; ' + str(liability).strip()   
         return c  
+    
+    def add_490(self, value, record):#str(row['Edice, svazek'])
+        # regex pattern to match a string before and after a comma
+        pattern_comma = r"^(.*?);(.*)$"
+
+        # Search for the pattern in the text
+        comma = re.match(pattern_comma, value)
+        
+        if comma:
+            series_statement = comma.group(1).strip()  # Extract and strip leading/trailing whitespace
+            volume = comma.group(2).strip() 
+            record.add_ordered_field(Field(tag='490', indicators = ['0', ' '], subfields = [Subfield(code = 'a', value=series_statement),
+                                                                                            Subfield(code = 'v', value = volume) ]))
+        else:
+            record.add_ordered_field(Field(tag='490', indicators = ['0', ' '], subfields = [Subfield(code = 'a', value=value) ])) 
+            
+        return record   
       
     def add_994_book(self, row, df, record):
         """Adds id's of all parts of the collective work to field 994."""
@@ -372,7 +376,7 @@ class Bibliografie_record(ABC):
             book_rows = [i for i, val in enumerate(is_part_of) if val]
             for i in book_rows:
                 r = df.iloc[i]
-                number = self.tag+"".join(['0' for a in range(6-len(str(row['Číslo záznamu'])))]) + str(r['Číslo záznamu'])
+                number = self.tag+"".join(['0' for _ in range(6-len(str(row['Číslo záznamu'])))]) + str(r['Číslo záznamu'])
                 record.add_ordered_field(Field(tag = '994', indicators = [' ', ' '], subfields = [Subfield(code= 'a', value = 'DN'),
                                                                                                 Subfield(code = 'b',value = number)] ))   
         return record             
@@ -403,11 +407,15 @@ class Bibliografie_record(ABC):
             record.add_ordered_field(Field(tag = '300', indicators=[' ', ' '], subfields=[Subfield(code='a', value= str(int(row['Počet stran'])) + ' p.'), ]))
 
         if not(pd.isnull(row['Volná poznámka'])):
-            note = row['Volná poznámka']
-            if any(x in note for x in self.ordinal) and 'vydání' in note:
-                record.add_ordered_field(Field(tag = '250', indicators=[' ', ' '], subfields=[Subfield(code='a', value= row['Volná poznámka']) ]))
-            else:     
-                record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= row['Volná poznámka']) ]))
+            for note in row['Volná poznámka'].split('§'): # greek is 
+                if any(x in note for x in self.ordinal) and 'vydání' in note:
+                    record.add_ordered_field(Field(tag = '250', indicators=[' ', ' '], subfields=[Subfield(code='a', value= note.strip() )]))
+                elif 'dvojjazyčn' in note.lower():
+                    record.add_ordered_field(Field(tag = '655', indicators=[' ', '7'], subfields=[Subfield(code='a', value= 'dvojjazyčná vydání' ),
+                                                                                                  Subfield(code='7', value= 'fd194533' ),
+                                                                                                  Subfield(code='2', value= 'czenas' )]))
+                else:     
+                    record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= note.strip()) ]))
 
         if not(pd.isnull(row['technická poznámka'])):   
             record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= row['technická poznámka']) ]))     

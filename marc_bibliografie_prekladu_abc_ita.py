@@ -4,6 +4,7 @@ import pandas as pd
 from pymarc.field import Field
 import re
 import pickle
+import marc_extra_codes
 
 class Bibliografie_record_ita(Bibliografie_record): 
     
@@ -84,19 +85,29 @@ class Bibliografie_record_ita(Bibliografie_record):
 
         else:
             publication = row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if country == 'Itálie': publication_country = 'it-'
-            elif country == 'Česká republika':publication_country = 'xr-'    
-            else: publication_country = 'xx-'
+            matches = re.findall(r'\(\s*(\w+)\s*\)', publication)
 
-        record = self.add_008(row, record, publication_country, "ita")
+            if len(matches) == 1:
+                country =  matches[0]
+                if country == 'Itálie': publication_country = 'it-'
+                elif country == 'Česká republika': publication_country = 'xr-'
+                elif country : publication_country = 'xx-'         
+            elif len(matches) == 2 : 
+                if matches[0] == matches[1]: publication_country = 'it-'
+                else:  publication_country = 'vp-'
+            else: publication_country = 'xx-'    
+
+        record = self.add_008(row, record, publication_country, 'mul' if ',' in row['Jazyk díla'] else 'ita')
+        record = self.add_041(row, record)
         record = self.add_commmon(row, record, author, code, translators)  
         record = self.add_common_specific(row, record, author, translators)    
         record = self.add_264(row, record)
-        if row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] == 'souborné dílo':
-            self.add_994_book(row, df, record)     
+
+        if not pd.isnull(row['Edice, svazek']):    
+            record = self.add_490(row['Edice, svazek'], record)
+
+        #if row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] == 'souborné dílo':
+        self.add_994_book(row, df, record)     
         return record
     
     
@@ -125,15 +136,21 @@ class Bibliografie_record_ita(Bibliografie_record):
 
         else:
             publication = book_row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if country == 'Itálie': publication_country = 'it-'
-            elif country == 'Česká republika': publication_country = 'xr-'    
-            else: publication_country = 'xx-'
+            matches = re.findall(r'\(\s*(\w+)\s*\)', publication)
+
+            if len(matches) == 1:
+                country =  matches[0]
+                if country == 'Itálie': publication_country = 'it-'
+                elif country == 'Česká republika': publication_country = 'xr-'
+                elif country : publication_country = 'xx-'         
+            elif len(matches) == 2 : publication_country = 'vp-'
+            else: publication_country = 'xx-' 
         
-        record = self.add_008(book_row, record, publication_country, "ita")
+        record = self.add_008(book_row, record, publication_country, 'mul' if ',' in book_row['Jazyk díla'] else 'ita')
+        record = self.add_041(book_row, record)
         record = self.add_264(book_row, record)
+        if not pd.isnull(book_row['Edice, svazek']):    
+            record = self.add_490(book_row['Edice, svazek'], record) 
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators)   
         record = self.add_994_part_of_book(row, record)
@@ -163,7 +180,8 @@ class Bibliografie_record_ita(Bibliografie_record):
             elif country == 'Česká republika': publication_country = 'xr-'    
             else: publication_country = 'xx-'
 
-        record = self.add_008(row, record, publication_country, "ita") 
+        record = self.add_008(row, record, publication_country, "ita")
+        record = self.add_041(row, record) 
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators) 
         record = self.add_773(record, row)
@@ -182,7 +200,7 @@ if __name__ == "__main__":
     # final file
     OUT = 'data/marc_ita.mrc'
 
-    df = pd.read_csv(IN, encoding='utf_8')
+    df = marc_extra_codes.load_df_csv(IN, 'ita')
 
     err = [] 
     # table with authority codes

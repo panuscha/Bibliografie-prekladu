@@ -95,29 +95,25 @@ class Bibliografie_record_fin(Bibliografie_record):
         """
                 # matches first word in string
         skip = '0'
-        b = '' ## subfield b was originally a subtitle
         c = ''
-        if not pd.isnull(row["Doplnění názvu"]):
-            b = row["Doplnění názvu"]
         if not pd.isnull(row['Údaje o odpovědnosti a další informace (z titulní strany)']):
             c = row['Údaje o odpovědnosti a další informace (z titulní strany)']      # Údaje o odpovědnosti a další informace
         title = title.strip()      
-        if b == '' and c == '' :                                                                           
+        if subtitle == '' and c == '' :                                                                           
             record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " ." ), ]))    # TODO - should this end with '/' ???     + " /"                                                                 
         else:
             if c == '':
                 #subtitle = subtitle.strip()
                 record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= b + " ."),])) # TODO - should this end with '/' ???     + " /" 
-            elif b == '':  
+                                                                                        Subfield(code='b', value= subtitle + " ."),])) # TODO - should this end with '/' ???     + " /" 
+            elif subtitle  == '':  
                 c = c.strip()    
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " /"),
                                                                                                 Subfield(code='c', value= c)]))
             else:
-                subtitle = subtitle.strip()
                 c = c.strip() 
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= b + " /"),
+                                                                                        Subfield(code='b', value= subtitle + " /"),
                                                                                         Subfield(code='c', value= c)]))
         return record        
                 
@@ -130,7 +126,8 @@ class Bibliografie_record_fin(Bibliografie_record):
             record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title),
                                                                                         Subfield(code='l', value= 'finsky'), ])) 
             
-        (title, subtitle) = self.get_title_subtitle(str(row['Název díla dle titulu v latince']))
+        title = row['Název díla dle titulu v latince'] if not pd.isnull(row['Název díla dle titulu v latince']) else ''
+        subtitle  = row["Doplnění názvu" ]if not pd.isnull(row["Doplnění názvu"]) else ''
         liabiliy = row['Údaje o odpovědnosti a další informace (z titulní strany)']
         record = self.add_245(row, liabiliy, title, subtitle, author, translators,record) 
         record = self.add_998(row, record)
@@ -157,21 +154,27 @@ class Bibliografie_record_fin(Bibliografie_record):
 
         else:
             publication = row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if country == 'Finsko':
-                publication_country = 'fi-'
-            elif country == 'Česká republika':
-                publication_country = 'xr-'    
-            else:
-                publication_country = 'xx-'      
+            matches = re.findall(r'\(\s*(\w+)\s*\)', publication)
+
+            if len(matches) == 1:
+                country =  matches[0]
+                if country == 'Finsko': publication_country = 'fi-'
+                elif country == 'Česká republika': publication_country = 'xr-'
+                elif country == 'Švédsko': publication_country = 'se-'
+                else: publication_country = 'xx-'         
+            elif len(matches) == 2 : 
+                if matches[0] == matches[1]: publication_country = 'fi-'
+                else:  publication_country = 'vp-'
+            else: publication_country = 'xx-'      
           
         record = self.add_008(row, record, publication_country, "fin")
         record = self.add_041(row, record)
         record = self.add_commmon(row, record, author, code, translators)  
         record = self.add_common_specific(row, record, author, translators)    
         record = self.add_264(row, record)
+
+        if not pd.isnull(row['Edice, svazek']):    
+            record = self.add_490(row['Edice, svazek'], record)
         
         #if row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] == 'souborné dílo':
         self.add_994_book(row, df, record)   
@@ -212,21 +215,28 @@ class Bibliografie_record_fin(Bibliografie_record):
 
         else:
             publication = book_row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if country == 'Finsko':
-                publication_country = 'fi-'
-            elif country == 'Česká republika':
-                publication_country = 'xr-'    
-            else:
-                publication_country = 'xx-'  
+            matches = re.findall(r'\(\s*(\w+)\s*\)', publication)
+
+            if len(matches) == 1:
+                country =  matches[0]
+                if country == 'Finsko': publication_country = 'fi-'
+                elif country == 'Česká republika': publication_country = 'xr-'
+                elif country == 'Švédsko': publication_country = 'se-'
+                else: publication_country = 'xx-'         
+            elif len(matches) == 2 : 
+                if matches[0] == matches[1]: publication_country = 'fi-'
+                else:  publication_country = 'vp-'
+            else: publication_country = 'xx-' 
+            
+             
 
             
         
-        record = self.add_008(book_row, record, publication_country, "fin")
+        record = self.add_008(book_row, record, publication_country, 'mul' if ',' in book_row['Jazyk díla'] else 'fin')
         record = self.add_041(book_row, record)
         record = self.add_264(book_row, record)
+        if not pd.isnull(book_row['Edice, svazek']):    
+            record = self.add_490(book_row['Edice, svazek'], record) 
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators)   
         record = self.add_994_part_of_book(row, record)
@@ -263,7 +273,7 @@ class Bibliografie_record_fin(Bibliografie_record):
             else:
                 publication_country = 'xx-' 
         
-        record = self.add_008(row, record,publication_country, "fin") 
+        record = self.add_008(row, record,publication_country, 'mul' if ',' in row['Jazyk díla'] else 'fin') 
         record = self.add_041(row, record)
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_common_specific(row, record, author, translators) 
@@ -295,7 +305,7 @@ if __name__ == "__main__":
     OUT = 'data/marc_fin.mrc'
 
     
-    df = marc_extra_codes.load_df_csv(IN)
+    df = marc_extra_codes.load_df_csv(IN, 'fin')
     # table with authority codes
     finalauthority_path = 'data/finalauthority_simple.csv'
 
@@ -308,27 +318,24 @@ if __name__ == "__main__":
     dup_count_fin = 0
     dup_count_unfin = 0
 
+    err = []
     found_records = []
         # writes data to file in variable OUT
     with open(OUT , 'wb') as writer:
         #iterates all rows in the table
         for index, row in df.iterrows():
+            try:
+                print(row['Číslo záznamu'])
+                bib_fin = Bibliografie_record_fin(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
+                                                    dict_author__code_work_path =  dict_author__code_work_path, \
+                                                    fennica_path="data/fennica_czech.obj", clb_trl_path="data/clb_trl_fin.obj")
+                title = row['Název díla dle titulu v latince']
+                (author_name,author_code), _  = bib_fin.add_author_code(row['Autor/ka + kód autority'], Record(to_unicode=True,
+                                                        force_utf8=True))
+                
+                year = row['Rok']
+                print(year)
 
-            print(row['Číslo záznamu'])
-            bib_fin = Bibliografie_record_fin(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
-                                              dict_author__code_work_path =  dict_author__code_work_path, \
-                                              fennica_path="data/fennica_czech.obj", clb_trl_path="data/clb_trl_fin.obj")
-            title = row['Název díla dle titulu v latince']
-            (author_name,author_code), _  = bib_fin.add_author_code(row['Autor/ka + kód autority'], Record(to_unicode=True,
-                                                    force_utf8=True))
-            
-            year = row['Rok']
-            print(year)
-            
-            # find duplicate rows in clb_trl database
-            #df_dup_record = bib_fin.clb_trl[(bib_fin.clb_trl['title_trl'] == title) & (bib_fin.clb_trl['author_code'] == author_code) & (bib_fin.clb_trl['pub_year'] == year)]
-            
-            if True: # df_dup_record.empty: ### CHECK DUPLICATES
                 if 'kniha' or 'antologie' in row['Typ záznamu']: 
                     record = bib_fin.create_record_book(row, df)
                 if 'část knihy' in row['Typ záznamu']: 
@@ -338,5 +345,8 @@ if __name__ == "__main__":
                 #print(record)    
                 writer.write(record.as_marc())
                 pickle.dump( bib_fin.dict_author_work, open( "data/dict_author_work.obj", "wb" ) )
-                pickle.dump( bib_fin.dict_author_code_work, open( "data/dict_author_code_work.obj", "wb" ) )              
+                pickle.dump( bib_fin.dict_author_code_work, open( "data/dict_author_code_work.obj", "wb" ) ) 
+            except :
+                err.append(row['Číslo záznamu'])
+    print(err)                 
     writer.close()

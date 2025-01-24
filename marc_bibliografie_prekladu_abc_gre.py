@@ -1,20 +1,21 @@
 from marc_bibliografie_prekladu_abc import Bibliografie_record
 from abc import ABC, abstractmethod 
-from pymarc import Record, MARCReader, Subfield
+from pymarc import Record, Subfield
 import pandas as pd
 from pymarc.field import Field
-from datetime import datetime
 import re
-import random
 import pickle 
-
+import numpy as np
+import marc_extra_codes
 
 class Bibliografie_record_gre(Bibliografie_record):
     def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path):
         super(Bibliografie_record_gre, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path)
         self.greek_articles =  ['ένα', 'έναν', 'ένας', 'ενός','η','μια','μια(ν)','μιας','ο','οι', 'τα','τη(ν)','της','τις','το','τον','του','τους','των']  ## TODO: ADD GREEK ARTICLES
         self.tag = 'gr23' 
-        
+
+
+    ## TODO: NA TO SE UŽ NEDÁ KOUKAT PŘEPSAT    
     def get_translators_and_other_roles(self, other_roles, record):
         # Regex pattern to match text between parentheses  
         pattern_role = r"\((.*?)\)"
@@ -97,7 +98,7 @@ class Bibliografie_record_gre(Bibliografie_record):
             if c == '':
                 subtitle = subtitle.strip()
                 record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= title + " ."),]))
+                                                                                        Subfield(code='b', value= subtitle + " ."),]))
             elif subtitle == '':  
                 c = c.strip()    
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " /"),
@@ -106,36 +107,21 @@ class Bibliografie_record_gre(Bibliografie_record):
                 subtitle = subtitle.strip()
                 c = c.strip() 
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= title + " /"),
+                                                                                        Subfield(code='b', value= subtitle + " /"),
                                                                                         Subfield(code='c', value= c)]))
         return record   
     
-    def add_490(self, value, record):#str(row['Edice, svazek'])
-        # regex pattern to match a string before and after a comma
-        pattern_comma = r"^(.*?),(.*)$"
-
-        # Search for the pattern in the text
-        comma = re.match(pattern_comma, value)
-        
-        if comma:
-            series_statement = comma.group(1).strip()  # Extract and strip leading/trailing whitespace
-            volume = comma.group(2).strip() 
-            record.add_ordered_field(Field(tag='490', indicators = ['0', ' '], subfields = [Subfield(code = 'a', value=series_statement),
-                                                                                            Subfield(code = 'v', value = volume) ]))
-        else:
-            record.add_ordered_field(Field(tag='490', indicators = ['0', ' '], subfields = [Subfield(code = 'a', value=value) ])) 
-            
-        return record        
+         
 
     def add_880(self, row, record):
         """links latin and greek script together
         název díla v původním písmu - 245, nakladatel v pův. písmu - 264, název edice - 490, další role - 700, název časopisu - 773 
         """
-        fields_codes = {'245': 'Název díla v původním písmu', 
-                        '264': 'Nakadatel v původním písmu', 
+        fields_codes = {'245': 'Název díla v původním písmu',  # can have subtitle - then in subfield b 
+                        '264': 'Nakadatel v původním písmu', # in subfield 'b'
                         '490': 'Název edice v původním písmu',
                         '700': 'Další role v původním písmu', 
-                        '773': 'Název časopisu v původním písmu'}
+                        '773': 'Název časopisu v původním písmu'} # is in subfield t
         last_index = 1
         has_code = set()
         for code in fields_codes.keys():
@@ -173,14 +159,28 @@ class Bibliografie_record_gre(Bibliografie_record):
                     for _ in range(n_o_roles[0]):
                         ind1 = record[code].indicator1
                         ind2 = record[code].indicator2
-                        record.add_ordered_field(Field(tag='880', indicators = [ind1, ind2], subfields = [Subfield(code='6', value= '{code}-0{last}/(S'.format(code = code, last = str(last_index))),
+                        if code == '245' and value.find(':') != -1:
+                            title = value.split(':')[0]
+                            subtitle = value.split(':')[1]
+                            record.add_ordered_field(Field(tag='880', indicators = [ind1, ind2], subfields = [Subfield(code='6', value= '{code}-0{last}/(S'.format(code = code, last = str(last_index))),
+                                                                                        Subfield(code='a', value= title + " :"),
+                                                                                        Subfield(code='b', value= subtitle + " .") ])) 
+                        
+                        elif code == '264':
+                            record.add_ordered_field(Field(tag='880', indicators = [ind1, ind2], subfields = [Subfield(code='6', value= '{code}-0{last}/(S'.format(code = code, last = str(last_index))),
+                                                                                        Subfield(code='b', value= value.strip()), ]))    
+                        elif code == '773':
+                            record.add_ordered_field(Field(tag='880', indicators = [ind1, ind2], subfields = [Subfield(code='6', value= '{code}-0{last}/(S'.format(code = code, last = str(last_index))),
+                                                                                        Subfield(code='t', value= value.strip()), ]))  
+                        else:    
+                            record.add_ordered_field(Field(tag='880', indicators = [ind1, ind2], subfields = [Subfield(code='6', value= '{code}-0{last}/(S'.format(code = code, last = str(last_index))),
                                                                                         Subfield(code='a', value= value.strip()), ]))
                         last_index = last_index+1
                     if code_700: n_o_roles.pop(0)   
         return record
     
     
-    def add_common_specific(self, row, record, author, translators):
+    def add_common_specific(self, row, record):
         " 001, 240, title, subtitle, liability -> 245"    
        
         if not(pd.isnull(row['Původní název'])) and not (("originál neznámý" in str(row['Původní název']).lower())  or ("originál neexistuje" in str(row['Původní název']).lower())):
@@ -230,19 +230,23 @@ class Bibliografie_record_gre(Bibliografie_record):
 
         else:
             publication = book_row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if 'Česk' in country: publication_country = 'xr-'
-            elif country == 'Řecko': publication_country = 'gr-'    ## GREECE - > GR ????     
-            elif country == 'Itálie': publication_country = 'it-'  
+            matches = re.findall(r'\(\s*(\w+)\s*\)', publication)
+
+            if len(matches) == 1:
+                country =  matches[0]
+                if country == 'Řecko': publication_country = 'gr-'
+                elif country == 'Česká republika': publication_country = 'xr-'
+                else : publication_country = 'xx-'         
+            elif len(matches) == 2 : 
+                if matches[0] == matches[1]: publication_country = 'gr-'
+                else:  publication_country = 'vp-'
             else: publication_country = 'xx-'    
         
-        record = self.add_008(book_row, record, publication_country, "gre")      
+        record = self.add_008(book_row, record, publication_country, 'mul' if ',' in book_row['Jazyk díla'] else 'gre')      
         record = self.add_041(book_row, record) 
         record = self.add_264(book_row, record)
         record = self.add_commmon(row, record, author, code, translators)
-        record = self.add_common_specific(row, record, author, translators)    
+        record = self.add_common_specific(row, record)    
         record = self.add_994_part_of_book(row, record)
         book_row['Název díla v původním písmu'] = row['Název díla v původním písmu']
         record = self.add_880(book_row, record)  
@@ -274,23 +278,25 @@ class Bibliografie_record_gre(Bibliografie_record):
 
         else:
             publication = row['Město vydání, země vydání, nakladatel'] 
-            start = publication.find('(')+1
-            end = publication.find(')') 
-            country = publication[start:end]
-            if country == 'Česká republika':
-                publication_country = 'xr-'
-            elif country == 'Řecko':
-                publication_country = 'gr-'    ## GREECE - > GR ????      
-            else:
-                publication_country = 'xx-'     
+            matches = re.findall(r'\(\s*(\w+)\s*\)', publication)
+
+            if len(matches) == 1:
+                country =  matches[0]
+                if country == 'Řecko': publication_country = 'gr-'
+                elif country == 'Česká republika': publication_country = 'xr-'
+                else : publication_country = 'xx-'         
+            elif len(matches) == 2 : 
+                if matches[0] == matches[1]: publication_country = 'gr-'
+                else:  publication_country = 'vp-'
+            else: publication_country = 'xx-'        
             
-        record = self.add_008(row, record, publication_country, "gre")
+        record = self.add_008(row, record, publication_country, 'mul' if ',' in row['Jazyk díla'] else 'gre')
         record = self.add_commmon(row, record, author, code, translators) 
         record = self.add_264(row, record)
-        record = self.add_common_specific(row, record, author, translators)      
+        record = self.add_common_specific(row, record)      
         
-        if  row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] in ['souborné dílo', 'antologie']:
-            record = self.add_994_book(row, df, record)   
+        #if  row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] in ['souborné dílo', 'antologie']:
+        record = self.add_994_book(row, df, record)   
             
         record = self.add_880(row, record)        
         return record
@@ -335,7 +341,7 @@ class Bibliografie_record_gre(Bibliografie_record):
         record = self.add_008(row, record, publication_country, "gre") 
         record = self.add_commmon(row, record, author, code, translators)
         record = self.add_773(record, row)
-        record = self.add_common_specific(row, record, author, translators)  
+        record = self.add_common_specific(row, record)  
         record = self.add_880(row, record)  
         return record 
     
@@ -359,7 +365,8 @@ if __name__ == "__main__":
     # final file
     OUT = 'data/marc_gre.mrc'
 
-    df = pd.read_csv(IN, encoding='utf_8')
+    df = marc_extra_codes.load_df_csv(IN, 'gre')
+    
 
     # table with authority codes
     finalauthority_path = 'data/finalauthority_simple.csv'
