@@ -82,14 +82,14 @@ class Bibliografie_record_fin(Bibliografie_record):
             finnish_id = row["Finské id"]
             fennica_info = self.df_fennica[self.df_fennica.index==finnish_id].squeeze()
                 
-            if fennica_info.empty:
+            if not fennica_info.empty:
                 finnish_id = row["Finské id"]
                 record.add_ordered_field(Field(tag='998', indicators = [' ', ' '], subfields = [Subfield(code='a', value= "https://melinda.kansalliskirjasto.fi/byid/{fennica}".format(fennica = finnish_id))]))
         return record
 
         
        
-    def add_245(self,row, liability, title, subtitle, author, translators,  record):
+    def add_245(self,row, title, subtitle, record):
         """Adds data to subfield 245. 
         Finds if work's title starts with an article -> writes how many positions the article takes
         """
@@ -100,20 +100,20 @@ class Bibliografie_record_fin(Bibliografie_record):
             c = row['Údaje o odpovědnosti a další informace (z titulní strany)']      # Údaje o odpovědnosti a další informace
         title = title.strip()      
         if subtitle == '' and c == '' :                                                                           
-            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " ." ), ]))    # TODO - should this end with '/' ???     + " /"                                                                 
+            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + "." ), ]))    # TODO - should this end with '/' ???     + " /"                                                                 
         else:
             if c == '':
                 #subtitle = subtitle.strip()
-                record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= subtitle + " ."),])) # TODO - should this end with '/' ???     + " /" 
+                record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " : "), 
+                                                                                        Subfield(code='b', value= subtitle + "."),])) # TODO - should this end with '/' ???     + " /" 
             elif subtitle  == '':  
                 c = c.strip()    
-                record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " /"),
+                record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " / "),
                                                                                                 Subfield(code='c', value= c)]))
             else:
                 c = c.strip() 
-                record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= subtitle + " /"),
+                record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " : "), 
+                                                                                        Subfield(code='b', value= subtitle + " / "),
                                                                                         Subfield(code='c', value= c)]))
         return record        
                 
@@ -128,8 +128,7 @@ class Bibliografie_record_fin(Bibliografie_record):
             
         title = row['Název díla dle titulu v latince'] if not pd.isnull(row['Název díla dle titulu v latince']) else ''
         subtitle  = row["Doplnění názvu" ]if not pd.isnull(row["Doplnění názvu"]) else ''
-        liabiliy = row['Údaje o odpovědnosti a další informace (z titulní strany)']
-        record = self.add_245(row, liabiliy, title, subtitle, author, translators,record) 
+        record = self.add_245(row, title, subtitle, record) 
         record = self.add_998(row, record)
         return record 
      
@@ -228,10 +227,6 @@ class Bibliografie_record_fin(Bibliografie_record):
                 else:  publication_country = 'vp-'
             else: publication_country = 'xx-' 
             
-             
-
-            
-        
         record = self.add_008(book_row, record, publication_country, 'mul' if ',' in book_row['Jazyk díla'] else 'fin')
         record = self.add_041(book_row, record)
         record = self.add_264(book_row, record)

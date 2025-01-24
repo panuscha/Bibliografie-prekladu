@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 
 print("Reading excel file")
-read_excel_bib = "data/preklady/excel/Bibliografie překladů - tabulka (s příklady) - řečtina.xlsx" #"data/preklady/excel/Bibliografie prekladu.xlsx" #
+read_excel_bib = "data/preklady/excel/Bibliografie překladů - tabulka (s příklady) - finština.xlsx" #"data/preklady/excel/Bibliografie prekladu.xlsx" #
 df = pd.read_excel(read_excel_bib, index_col=0, sheet_name='List1' )
 df = df.reset_index()  
 

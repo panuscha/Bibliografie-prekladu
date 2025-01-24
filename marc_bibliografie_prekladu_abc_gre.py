@@ -93,21 +93,21 @@ class Bibliografie_record_gre(Bibliografie_record):
             c = row['Údaje o odpovědnosti a další informace (z titulní strany)']       
         title = title.strip()     
         if subtitle == '' and c == '':                                                                          
-            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " ."), ]))                                                                          
+            record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + "."), ]))                                                                          
         else:
             if c == '':
                 subtitle = subtitle.strip()
-                record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= subtitle + " ."),]))
+                record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " : "), 
+                                                                                        Subfield(code='b', value= subtitle + "."),]))
             elif subtitle == '':  
                 c = c.strip()    
-                record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " /"),
+                record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " / "),
                                                                                                 Subfield(code='c', value= c)]))
             else:
                 subtitle = subtitle.strip()
                 c = c.strip() 
-                record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " :"), 
-                                                                                        Subfield(code='b', value= subtitle + " /"),
+                record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " : "), 
+                                                                                        Subfield(code='b', value= subtitle + " / "),
                                                                                         Subfield(code='c', value= c)]))
         return record   
     

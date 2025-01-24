@@ -6,7 +6,7 @@ from datetime import datetime
 import re
 import random
 import pickle
-from deepdiff import DeepDiff
+from collections import defaultdict
 
 
 class Bibliografie_record(ABC): 
@@ -249,7 +249,7 @@ class Bibliografie_record(ABC):
             subtitle = data[split+1:]
             title = title.strip()
             subtitle = subtitle.strip()      
-            return(title, subtitle)   
+            return(title, subtitle)  
 
     def add_264(self, row, record): ## TODO: WHAT TO DO WHEN 2 PUBLISHERS??
         """Adds data to subfield 264. 
@@ -289,6 +289,57 @@ class Bibliografie_record(ABC):
    
             record.add_ordered_field(Field(tag = '264', indicators = [' ', '1'], subfields = subfield_publisher))
         return record            
+    
+
+    # def add_264(self, row, record): ## TODO: WHAT TO DO WHEN 2 PUBLISHERS??
+    #     """Adds data to subfield 264. 
+    #     Consists of city of publication, coutry of publications and the publisher
+    #     """
+    #     if pd.isnull(row['Město vydání, země vydání, nakladatel']):
+    #         return record    
+    #     city_dict = defaultdict(list)
+    #     year = row['Rok'] 
+    #     city_country_publisher = row['Město vydání, země vydání, nakladatel'].strip()
+    #     for element in city_country_publisher.split('§'):
+    #                                 # Matches everything before ( 
+    #         city_unknown = re.search('.*(?=\s+\()', element)
+    #         if city_unknown:
+    #             city_unknown = city_unknown.group(0)
+    #             # if string contains ? -> city is unknown
+    #             if  '?' in city_unknown:
+    #                 city = "[s. l.]"
+    #             else:  
+    #                 # matches first words in string   
+    #                 city =  re.search('^[\w\s]+', element).group(0).strip()
+    #         else:
+    #             city = "[s. l.]"        
+    #         publisher = re.search('(?<=\:\s).+', element)
+
+            
+    #         if publisher:
+    #             publisher = publisher.group(0).strip() 
+    #             if city == "[s. l.]" and len(city_dict.keys()) == 1 and city_dict.keys()[0] != city:
+    #                 city_dict[city_dict.keys()[0]].append(publisher)
+    #             else:
+    #                 city_dict[city].append(publisher)
+                
+    #     subfield_publisher = []        
+    #     for i,(city, publishers) in enumerate(city_dict.items()):
+    #         if len(publishers) == 0:
+    #             subfield_publisher += [Subfield(code='a', value= city + ','), Subfield(code='c', value=str(year).replace('.0',''))]  if not pd.isnull(year) else [Subfield(code='a', value= city )]
+    #             record.add_ordered_field(Field(tag = '264', indicators = [' ', '1'], subfields = subfield_publisher))
+    #             return 
+    #         for j, publisher in enumerate(publishers) :
+    #                 if i+1 < len(city_dict.keys()): add = ' ; '
+    #                 elif j+1 < len(publishers): add = ' : '   
+    #                 elif pd.isnull(year): add = '.'
+    #                 else: add = ', '       
+    #                 subfield_publisher = [Subfield(code='a', value= city + ' : '), Subfield(code='b', value=publisher + add)]
+
+    #     if not pd.isnull(year) : subfield_publisher += Subfield(code='c', value=str(year).replace('.0',''))       
+    #     record.add_ordered_field(Field(tag = '264', indicators = [' ', '1'], subfields = subfield_publisher))
+        
+    #     return record            
 
 
     def add_translator(self, translators, record):
