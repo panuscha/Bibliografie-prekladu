@@ -31,6 +31,11 @@ class Bibliografie_record_gre(Bibliografie_record):
             match_name = re.search(pattern_name, t)
             if match_role and match_name:
                 name = match_name.group(0)
+                if ',' not in name: 
+                    t_names = name.split()
+                    fist_name = ' '.join(t_names[:-1])
+                    last_name = t_names[-1]
+                    name = f'{last_name}, {fist_name}' 
                 roles = match_role.group(1)
                 roles = roles.split(",")
                 for role in roles:
@@ -50,6 +55,11 @@ class Bibliografie_record_gre(Bibliografie_record):
         match_name = re.search(pattern_name, t)
         if match_role and match_name:
             name = match_name.group(0)
+            if ',' not in name: 
+                    t_names = name.split()
+                    fist_name = ' '.join(t_names[:-1])
+                    last_name = t_names[-1]
+                    name = f'{last_name}, {fist_name}' 
             roles = match_role.group(1)
             roles = roles.split(",")
             for role in roles:
@@ -100,12 +110,12 @@ class Bibliografie_record_gre(Bibliografie_record):
                 record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " : "), 
                                                                                         Subfield(code='b', value= subtitle + "."),]))
             elif subtitle == '':  
-                c = c.strip()    
+                c = c.strip().replace('§', ';')    
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " / "),
                                                                                                 Subfield(code='c', value= c)]))
             else:
                 subtitle = subtitle.strip()
-                c = c.strip() 
+                c = c.strip().replace('§', ';')
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " : "), 
                                                                                         Subfield(code='b', value= subtitle + " / "),
                                                                                         Subfield(code='c', value= c)]))
@@ -126,7 +136,7 @@ class Bibliografie_record_gre(Bibliografie_record):
         has_code = set()
         for code in fields_codes.keys():
             for field in record.get_fields(code):
-                has_code.add(code)
+                if code != '700' or field['4'] != 'aut': has_code.add(code)
         for code, column in fields_codes.items():
             if not pd.isnull(row[column]) and code in has_code:
                 l = last_index
@@ -140,19 +150,20 @@ class Bibliografie_record_gre(Bibliografie_record):
                     
                 for field in record.get_fields(code):
 
-                    subfields = field.subfields_as_dict()
-                    field.add_subfield(code = '6', value= '{code}-0{last}/(S'.format(code = code, last = str(l)) )
-                    
-                    for subfield_code, subfield_value in subfields.items():
-                        field.delete_subfield(subfield_code)
-                        field.add_subfield(code = subfield_code, value = subfield_value[0])
-                        if code_700 and subfield_code == 'a':
-                            if subfield_value == previous_name:
-                                n_o_roles[-1] += 1
-                            else:
-                                n_o_roles.append(1) 
-                                previous_name = subfield_value   
-                    l = l+1
+                    if code != '700' or field['4'] != 'aut':
+                        subfields = field.subfields_as_dict()
+                        field.add_subfield(code = '6', value= '{code}-0{last}/(S'.format(code = code, last = str(l)) )
+                        
+                        for subfield_code, subfield_value in subfields.items():
+                            field.delete_subfield(subfield_code)
+                            field.add_subfield(code = subfield_code, value = subfield_value[0])
+                            if code == '700' and subfield_code == 'a':
+                                if subfield_value == previous_name:
+                                    n_o_roles[-1] += 1
+                                else:
+                                    n_o_roles.append(1) 
+                                    previous_name = subfield_value   
+                        l = l+1
 
                 for value in row[column].split('§'):
                     
@@ -188,11 +199,18 @@ class Bibliografie_record_gre(Bibliografie_record):
             record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title),
                                                                                         Subfield(code='l', value= 'řecky'), ]))
             
+
+        record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= 'Marie Rákosníková: Recepce české literatury v Řecku. Bibliografie české literatury vydané v novořečtině. Diplomová práce. FF UK, Praha 2022.') ]))    
         if not(pd.isnull(row['Zdroj či odkaz'])) and not (row['Zdroj či odkaz'] == ' '):
             record.add_ordered_field(Field(tag = '998', indicators=[' ', ' '], subfields=[Subfield(code='a', value= row['Zdroj či odkaz'].strip()),] ) )    
             
         (title, subtitle) = self.get_title_subtitle(str(row['Název díla dle titulu v latince']))    
-        record = self.add_245(row, title, subtitle,  record)    
+        record = self.add_245(row, title, subtitle,  record)
+
+        rel_original = row['Vztah k originálu (překlad vs. adaptace)']
+        if not(pd.isnull(rel_original)) and rel_original != 'překlad':    
+            type_ad = row['Druh adaptace (slovem)']
+            record = self.add_787(record, rel_original, type_ad if not(pd.isnull(type_ad)) else None )       
          
         return record 
   
@@ -356,6 +374,9 @@ if __name__ == "__main__":
     czech_translations="data/czech_translations_full_18_01_2022.mrc" # obohacovat o kody 595
     # list of identifiers
     identifiers = []
+
+    #add_code to 008
+    
 
     dict_author_work_path = "data/dict_author_work.obj"
 

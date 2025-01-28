@@ -66,6 +66,12 @@ class Bibliografie_record_ita(Bibliografie_record):
         (title, subtitle) = self.get_title_subtitle(str(row['Název díla dle titulu (v příslušném písmu)']))
         liabiliy = row['Údaje o odpovědnosti a další informace']
         record = self.add_245(row, liabiliy, title, subtitle, author, translators,record) 
+
+        rel_original = row['Vztah k originálu (překlad vs. adaptace)']
+        if not(pd.isnull(rel_original)) and rel_original != 'překlad':    
+            type_ad = row['Druh adaptace (slovem)']
+            record = self.add_787(record, rel_original, type_ad if not(pd.isnull(type_ad)) else None )
+            
         record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= "Záznam zpracován bez výtisku v ruce"), ]))
         return record 
     

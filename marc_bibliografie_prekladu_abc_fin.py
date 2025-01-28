@@ -29,6 +29,11 @@ class Bibliografie_record_fin(Bibliografie_record):
             match_name = re.search(pattern_name, t)
             if match_role and match_name:
                 name = match_name.group(0)
+                if ',' not in name: 
+                    t_names = name.split()
+                    fist_name = ' '.join(t_names[:-1])
+                    last_name = t_names[-1]
+                    name = f'{last_name}, {fist_name}' 
                 roles = match_role.group(1)
                 roles = roles.split(",")
                 for role in roles:
@@ -48,6 +53,11 @@ class Bibliografie_record_fin(Bibliografie_record):
         match_name = re.search(pattern_name, t)
         if match_role and match_name:
             name = match_name.group(0)
+            if ',' not in name: 
+                    t_names = name.split()
+                    fist_name = ' '.join(t_names[:-1])
+                    last_name = t_names[-1]
+                    name = f'{last_name}, {fist_name}' 
             roles = match_role.group(1)
             roles = roles.split(",")
             for role in roles:
@@ -107,17 +117,17 @@ class Bibliografie_record_fin(Bibliografie_record):
                 record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + " : "), 
                                                                                         Subfield(code='b', value= subtitle + "."),])) # TODO - should this end with '/' ???     + " /" 
             elif subtitle  == '':  
-                c = c.strip()    
+                c = c.strip().replace('§', ';')    
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " / "),
                                                                                                 Subfield(code='c', value= c)]))
             else:
-                c = c.strip() 
+                c = c.strip().replace('§', ';') 
                 record.add_ordered_field(Field(tag = '245', indicators = ['1', skip], subfields = [Subfield(code='a', value= title + " : "), 
                                                                                         Subfield(code='b', value= subtitle + " / "),
                                                                                         Subfield(code='c', value= c)]))
         return record        
                 
-    def add_common_specific(self, row, record, author, translators):
+    def add_common_specific(self, row, record):
         " 001, 035, 240, title, subtitle, liability -> 245"
         record = self.add_035(row, record)
         
@@ -129,6 +139,13 @@ class Bibliografie_record_fin(Bibliografie_record):
         title = row['Název díla dle titulu v latince'] if not pd.isnull(row['Název díla dle titulu v latince']) else ''
         subtitle  = row["Doplnění názvu" ]if not pd.isnull(row["Doplnění názvu"]) else ''
         record = self.add_245(row, title, subtitle, record) 
+        record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= 'Hana Hlinovská: Bibliografie překladů české literatury do finštiny. Bakalářská práce. FF MU, Brno 2024.') ]))
+        
+        rel_original = row['Vztah k originálu (překlad vs. adaptace)']
+        if not(pd.isnull(rel_original)) and rel_original != 'překlad':    
+            type_ad = row['Druh adaptace (slovem)']
+            record = self.add_787(record, rel_original, type_ad if not(pd.isnull(type_ad)) else None )   
+        
         record = self.add_998(row, record)
         return record 
      
@@ -169,11 +186,11 @@ class Bibliografie_record_fin(Bibliografie_record):
         record = self.add_008(row, record, publication_country, "fin")
         record = self.add_041(row, record)
         record = self.add_commmon(row, record, author, code, translators)  
-        record = self.add_common_specific(row, record, author, translators)    
+        record = self.add_common_specific(row, record)    
         record = self.add_264(row, record)
 
         if not pd.isnull(row['Edice, svazek']):    
-            record = self.add_490(row['Edice, svazek'], record)
+            record = self.add_490(row['Edice, svazek'], record)    
         
         #if row['typ díla (celé dílo, úryvek, antologie, souborné dílo)'] == 'souborné dílo':
         self.add_994_book(row, df, record)   
@@ -233,7 +250,7 @@ class Bibliografie_record_fin(Bibliografie_record):
         if not pd.isnull(book_row['Edice, svazek']):    
             record = self.add_490(book_row['Edice, svazek'], record) 
         record = self.add_commmon(row, record, author, code, translators)
-        record = self.add_common_specific(row, record, author, translators)   
+        record = self.add_common_specific(row, record)   
         record = self.add_994_part_of_book(row, record)
         return record
     
@@ -271,7 +288,7 @@ class Bibliografie_record_fin(Bibliografie_record):
         record = self.add_008(row, record,publication_country, 'mul' if ',' in row['Jazyk díla'] else 'fin') 
         record = self.add_041(row, record)
         record = self.add_commmon(row, record, author, code, translators)
-        record = self.add_common_specific(row, record, author, translators) 
+        record = self.add_common_specific(row, record) 
         record = self.add_773(record, row)
         return record 
     

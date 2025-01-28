@@ -160,7 +160,7 @@ class Bibliografie_record(ABC):
             if original_work_title_orig is not None and original_work_title_orig != '' and original_work_title_orig != 'nan':     
                 record['595'].add_subfield(code = 't', value=original_work_title_orig)
             if id is not None:
-                record['595'].add_subfield(code = '1', value=id)                   
+                record['595'].add_subfield(code = '1', value=id.replace('-', ''))                   
             if not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
                 record['595'].add_subfield(code='i', value= row['Údaje o zprostředkovacím díle'].strip())
         elif not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
@@ -205,6 +205,13 @@ class Bibliografie_record(ABC):
             if not pd.isnull(year): subfields += [Subfield(code='9', value= str(year).replace('.0',''))]
             record.add_ordered_field(Field(tag='773', indicators = ['0', ' '], subfields =  subfields))
         return record    
+    
+    def add_787(self, record, rel_to_original, adaptation = None):
+        subfields = [Subfield(code = 'i', value = f'{rel_to_original} - {adaptation}' if adaptation is not None else f'{rel_to_original}' ),
+                     Subfield(code = 'a', value = record['100']['a']),
+                     Subfield(code = 't', value = record.title.rstrip(' /:'))]
+        record.add_ordered_field(Field(tag='787', indicators = ['0', ' '], subfields=subfields))
+        return record
                                                                         
 
     def add_author_code(self, data, record):
@@ -212,27 +219,33 @@ class Bibliografie_record(ABC):
         Also returns author's name and code as a tuple.
         """ 
         if not(pd.isnull(data)):
+            code_100 = True
             for data in data.split('§'): 
                 start = data.find('(')
                 end = data.find(')') 
                 if start == -1:
-                    record.add_ordered_field(Field(tag='100', indicators=['1',' '], subfields=[Subfield(code='a', value=data.strip() ),
+                    author = data
+                    code = None
+                    record.add_ordered_field(Field(tag='100' if code_100 else '700', indicators=['1',' '], subfields=[Subfield(code='a', value=data.strip() ),
                                                                                             Subfield(code='4', value='aut')]))
-                    return (data, None), record
+                    #return (data, None), record
             
-            
-                Subfields = []
-                # matches everything before '(' character 
-                author = re.search('.*(?=\s+\()', data).group(0).strip()
-                code = data[start+1: end].strip()
-                Subfields.append(Subfield(code='a', value=author + ', '))  # comma manual page 42 
-                if code in self.finalauthority.index:
-                        date = str(self.finalauthority.loc[code]['cz_dates']) 
-                        Subfields.append(Subfield(code = 'd', value=date))
-                Subfields.append(Subfield(code = '7', value=code))
-                Subfields.append(Subfield(code = '4', value='aut'))        
-                record.add_ordered_field(Field(tag='100', indicators=['1',' '], subfields=Subfields))                           
-            return (author, code), record
+                else: 
+                    Subfields = []
+                    # matches everything before '(' character 
+                    author = re.search('.*(?=\s+\()', data).group(0).strip()
+                    code = data[start+1: end].strip()
+                    Subfields.append(Subfield(code='a', value=author + ', '))  # comma manual page 42 
+                    if code in self.finalauthority.index:
+                            date = str(self.finalauthority.loc[code]['cz_dates']) 
+                            Subfields.append(Subfield(code = 'd', value=date))
+                    Subfields.append(Subfield(code = '7', value=code))
+                    Subfields.append(Subfield(code = '4', value='aut'))        
+                    record.add_ordered_field(Field(tag='100' if code_100 else '700', indicators=['1',' '], subfields=Subfields))  
+                if code_100: author_ret = author
+                if code_100: code_ret = code
+                code_100 = False
+            return (author_ret, code_ret), record
         else:
             return (None, None), record
 
@@ -349,6 +362,11 @@ class Bibliografie_record(ABC):
         # iterates through all iteraters devided by character §
         for element in translators.split('§'):
                 t = element.strip()
+                if ',' not in t: 
+                    t_names = t.split()
+                    fist_name = ' '.join(t_names[:-1])
+                    last_name = t_names[-1]
+                    t = f'{last_name}, {fist_name}' 
                 record.add_ordered_field(Field(tag='700', indicators=['1',' '], subfields=[Subfield(code='a', value= t),
                                                                                             Subfield(code='4', value= 'trl'),])) 
         return record        
@@ -440,6 +458,13 @@ class Bibliografie_record(ABC):
                                                                                                 Subfield(code = 'b',value = number)]))
         return record
 
+
+    def ISBN(self, record, isbn_number): 
+        isbn_number_original = isbn_number.replace('-', '')
+        len_ISBN = len(isbn_number_original)
+        if (len_ISBN == 10 or len_ISBN == 14) and  isbn_number_original.isnumeric(): 
+            record.add_ordered_field(Field(tag='020', indicators=[' ',' '], subfields=[Subfield(code='a', value= isbn_number.strip()),] )) 
+        return record
    
     def add_commmon(self, row, record, author, code, translators):
         """Adds data to fields that are common for all work types 
@@ -448,14 +473,14 @@ class Bibliografie_record(ABC):
         record.add_ordered_field(Field(tag='003', indicators = [' ', ' '], data='CZ PrUCL')) 
         
         if not(pd.isnull(row['ISBN'])):
-            record.add_ordered_field(Field(tag='020', indicators=[' ',' '], subfields=[Subfield(code='a', value= str(row['ISBN']).strip()),] )) 
-
+            record = self.ISBN(record, str(row['ISBN']))
+            
         record.add_ordered_field(Field(tag='040', indicators=[' ',' '], subfields=[Subfield(code='a', value= 'ABB060'),
                                                                                 Subfield(code='b', value= 'cze'),
                                                                                 Subfield(code='e', value= 'rda'),]))
         
-        if not(pd.isnull(row['Počet stran'])) and str(row['Počet stran']).isnumeric():
-            record.add_ordered_field(Field(tag = '300', indicators=[' ', ' '], subfields=[Subfield(code='a', value= str(int(row['Počet stran'])) + ' p.'), ]))
+        if not(pd.isnull(row['Počet stran'])) : #and str(row['Počet stran']).isnumeric()
+            record.add_ordered_field(Field(tag = '300', indicators=[' ', ' '], subfields=[Subfield(code='a', value= str(row['Počet stran']) + ' p.'), ]))
 
         if not(pd.isnull(row['Volná poznámka'])):
             for note in row['Volná poznámka'].split('§'): # greek is 
