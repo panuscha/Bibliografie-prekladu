@@ -1,9 +1,12 @@
 import pymarc
-from pymarc import Record, MARCReader, Subfield, Reader
+from pymarc import Record, MARCReader, Subfield, Reader, Field
 import pandas as pd
 import pickle
 import numpy as np
 from collections import defaultdict
+from ordered_set import OrderedSet
+from itertools import zip_longest
+
 
 def import_czech_fennica(path):
     "Reads czech FENNICA marc records and saves them as DataFrame"
@@ -69,7 +72,7 @@ def save_genre_audience(path):
     for column in df_work_database.columns:
         df_work_database[column] = df_work_database[column].apply(lambda x: str(x))
 
-    return { key: (audience, genre) for key, audience, genre in df_work_database[['perzistentní ID díla', 'publikum kód', 'hlavní žánr']] }
+    return {row['perzistentní ID díla']: (row['publikum kód'], row['hlavní žánr']) for _, row in df_work_database[['perzistentní ID díla', 'publikum kód', 'hlavní žánr']].iterrows()}
         
 
      
@@ -194,102 +197,6 @@ def load_df_csv(path, language):
     
     return df
 
-def select_languages_from_trl(lang, path):
-    ret = defaultdict(list)
-    with open(path, 'rb') as data:
-        reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
-        for record in reader:
-            remember_record = False
-            if record is None: print('Record id None')
-            else:
-                for field in record.get_fields('041'):
-                    for language in field.get_subfields('a'):
-                        if language == lang: 
-                            remember_record = True
-                            break
-                if remember_record:
-                    for field in record.get_fields('100'):
-                        subfields = field.subfields_as_dict()
-                        if 'a' in subfields.keys(): ret[subfields['a'][0]].append(record) 
-                        if '7' in subfields.keys(): ret[subfields['7'][0]].append(record)    
-    return ret
-
-def check_year(record_trl, record):
-    year = None
-    year_trl = None
-    for field in record.get_fields('264'):
-        subfield = field.subfields_as_dict()
-        year = field['c'].strip(' []') if 'c' in subfield.keys() else  None
-
-    for i in ['260', '264']:
-        for field in record_trl.get_fields(i):
-            subfield = field.subfields_as_dict()
-            if 'c' in subfield.keys():
-                year_trl = field['c'].strip(' []') 
-                break
-
-    return  year is not None and year_trl is not None and year == year_trl
-             
-
-
-def check_595(record_trl, record ) :
-    record_trl_code = '1'
-    record_code = '2'
-    for field in record_trl.get_fields('595'):
-        subfields = field.subfields_as_dict()
-        if '1' in subfields.keys(): record_trl_code = subfields['1'][0]  
-    for field in record.get_fields('595'):
-        subfields = field.subfields_as_dict()
-        if '1' in subfields.keys(): record_code = subfields['1'][0].replace('-', '') 
-    return  record_code == record_trl_code
-
-def write_marc_dupl( writer, record, record_trl,  ret):
-    author = record['100']['a']
-    ret.append(f'{record.title} {author}')
-    print(f'{record.title} {author}')
-    writer.write(record.as_marc())
-    writer.write(record_trl.as_marc())
-    return ret
-
-
-def iter_languages(lang, path_trl, path_lang, OUT):
-    trl_lang  = select_languages_from_trl(lang = lang, path = path_trl)
-    ret = []
-    with open(OUT , 'wb') as writer:
-        with open(path_lang, 'rb') as data:
-            reader = MARCReader(data, to_unicode=True, force_utf8=True, utf8_handling="strict")
-            for record in reader:
-                if record.leader[7] == 'm':
-                    for field in record.get_fields('100'):
-                        subfields = field.subfields_as_dict()
-                        if '7' in subfields.keys():
-                            code = field['7']
-                            if code in trl_lang.keys():
-                                for record_trl in trl_lang[code]:
-                                    if record_trl.title.rstrip(" /:,") == record.title.rstrip(" /:,") and check_year(record_trl, record):
-                                        ret = write_marc_dupl( writer, record, record_trl,  ret)    
-                                    else:
-                                        if check_595(record_trl, record) and check_year(record_trl, record):   
-                                            ret = write_marc_dupl( writer, record, record_trl,  ret)
-
-
-                        elif 'a' in subfields.keys():     
-                            code = field['a']
-                            if code in trl_lang.keys():
-                                for record_trl in trl_lang[code]:
-                                    if record_trl.title.rstrip(" /:,") == record.title.rstrip(" /:,") and check_year(record_trl, record):
-                                        ret = write_marc_dupl( writer, record, record_trl,  ret)
-                                    else:
-                                        if check_595(record_trl, record) and check_year(record_trl, record):   
-                                            ret = write_marc_dupl( writer, record, record_trl,  ret) 
-    return ret                           
-
-
-if __name__ == "__main__":
-    lang = 'ita'
-    ret = iter_languages(lang, path_trl= 'data/ucla_trl.mrc', path_lang= f'data/marc_{lang}.mrc', OUT=f'data/duplicities_{lang}.mrc')
-    print(ret)
-    print(len(ret))
 
 
 # if __name__ == "__main__":

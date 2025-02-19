@@ -7,12 +7,14 @@ import re
 import random
 import pickle
 from collections import defaultdict
+import marc_extra_codes
 
 
 class Bibliografie_record(ABC): 
 
-    def __init__(self, finalauthority_path, dict_author_work_path,dict_author_code_work_path,  **kwargs):
+    def __init__(self, finalauthority_path, dict_author_work_path,dict_author_code_work_path, codes_for_008, **kwargs):
         self.finalauthority = pd.read_csv(finalauthority_path,  index_col=0)
+        self.codes_for_008 = codes_for_008
         self.finalauthority.index= self.finalauthority['nkc_id']
         self.dict_author_work = pickle.load(open(dict_author_work_path, "rb" ))
         self.dict_author_code_work = pickle.load(open(dict_author_code_work_path, "rb" ))
@@ -103,6 +105,17 @@ class Bibliografie_record(ABC):
                 record['041'].add_subfield('k', m.strip())
         
         return record 
+    
+    def adjust_008(self, record, id ):
+        field = str(record['008'].data)
+        if id in self.codes_for_008.keys():
+            (audience, genre) = self.codes_for_008[id]
+            record.remove_fields('008')
+            if audience is not None: field = field[:22] + audience + field[23:]
+            if genre is not None: field = field[:33] + genre + field[34:]
+            record.add_ordered_field(Field(tag='008', indicators = [' ', ' '], data = field))   
+        return record
+        
 
     def add_595(self,record, row, author, code):
         """Adds data to field 595. 
@@ -152,15 +165,16 @@ class Bibliografie_record(ABC):
                         dict_titles[original_work_title.lower()] = id
                         self.dict_author_code_work[code] = dict_titles                
 
-            record.add_ordered_field(Field(tag='595', indicators = ['1', '2'], subfields = [Subfield(code='a', value=author_orig)  ]))
+            record.add_ordered_field(Field(tag='595', indicators = ['1', '2'], subfields = [Subfield(code='a', value=author_orig+',')  ]))
             if date is not None: 
                 record['595'].add_subfield(code = 'd', value=date)
             if code is not None: 
                 record['595'].add_subfield(code = '7', value=str(code))       
             if original_work_title_orig is not None and original_work_title_orig != '' and original_work_title_orig != 'nan':     
-                record['595'].add_subfield(code = 't', value=original_work_title_orig)
+                record['595'].add_subfield(code = 't', value=original_work_title_orig+'.')
             if id is not None:
-                record['595'].add_subfield(code = '1', value=id.replace('-', ''))                   
+                record['595'].add_subfield(code = '1', value=id.replace('-', ''))  
+                record = self.adjust_008(record, id)
             if not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
                 record['595'].add_subfield(code='i', value= row['Údaje o zprostředkovacím díle'].strip())
         elif not(pd.isnull(row['Údaje o zprostředkovacím díle'])):
@@ -430,7 +444,7 @@ class Bibliografie_record(ABC):
         if comma:
             series_statement = comma.group(1).strip()  # Extract and strip leading/trailing whitespace
             volume = comma.group(2).strip() 
-            record.add_ordered_field(Field(tag='490', indicators = ['0', ' '], subfields = [Subfield(code = 'a', value=series_statement),
+            record.add_ordered_field(Field(tag='490', indicators = ['0', ' '], subfields = [Subfield(code = 'a', value=series_statement + ' ; '),
                                                                                             Subfield(code = 'v', value = volume) ]))
         else:
             record.add_ordered_field(Field(tag='490', indicators = ['0', ' '], subfields = [Subfield(code = 'a', value=value) ])) 
@@ -480,7 +494,7 @@ class Bibliografie_record(ABC):
                                                                                 Subfield(code='e', value= 'rda'),]))
         
         if not(pd.isnull(row['Počet stran'])) : #and str(row['Počet stran']).isnumeric()
-            record.add_ordered_field(Field(tag = '300', indicators=[' ', ' '], subfields=[Subfield(code='a', value= str(row['Počet stran']) + ' p.'), ]))
+            record.add_ordered_field(Field(tag = '300', indicators=[' ', ' '], subfields=[Subfield(code='a', value= str(row['Počet stran']) + ' s.'), ]))
 
         if not(pd.isnull(row['Volná poznámka'])):
             for note in row['Volná poznámka'].split('§'): # greek is 

@@ -9,8 +9,8 @@ import numpy as np
 import marc_extra_codes
 
 class Bibliografie_record_gre(Bibliografie_record):
-    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path):
-        super(Bibliografie_record_gre, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path)
+    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path, codes_for_008 ):
+        super(Bibliografie_record_gre, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, codes_for_008 )
         self.greek_articles =  ['ένα', 'έναν', 'ένας', 'ενός','η','μια','μια(ν)','μιας','ο','οι', 'τα','τη(ν)','της','τις','το','τον','του','τους','των']  ## TODO: ADD GREEK ARTICLES
         self.tag = 'gr23' 
 
@@ -196,7 +196,7 @@ class Bibliografie_record_gre(Bibliografie_record):
        
         if not(pd.isnull(row['Původní název'])) and not (("originál neznámý" in str(row['Původní název']).lower())  or ("originál neexistuje" in str(row['Původní název']).lower())):
             original_title = row['Původní název'].strip()  
-            record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title),
+            record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title+'.'),
                                                                                         Subfield(code='l', value= 'řecky'), ]))
             
 
@@ -376,7 +376,7 @@ if __name__ == "__main__":
     identifiers = []
 
     #add_code to 008
-    
+    codes_for_008 = marc_extra_codes.save_genre_audience(path = 'data/work-database_archive.xlsx')
 
     dict_author_work_path = "data/dict_author_work.obj"
 
@@ -405,7 +405,7 @@ if __name__ == "__main__":
                     print(row['Číslo záznamu'])
                     print(row['Typ záznamu'])
                     bib_gre = Bibliografie_record_gre(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
-                                                      dict_author__code_work_path = dict_author__code_work_path)
+                                                      dict_author__code_work_path = dict_author__code_work_path, codes_for_008 = codes_for_008 )
                     if 'kniha' in row['Typ záznamu']: 
                         record = bib_gre.create_record_book(row, df)
                     if 'část knihy' in row['Typ záznamu']: 

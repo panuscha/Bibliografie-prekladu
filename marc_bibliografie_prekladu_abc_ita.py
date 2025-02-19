@@ -8,8 +8,8 @@ import marc_extra_codes
 
 class Bibliografie_record_ita(Bibliografie_record): 
     
-    def __init__(self, finalauthority_path, dict_author_work,dict_author__code_work_path):
-        super(Bibliografie_record_ita, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path)
+    def __init__(self, finalauthority_path, dict_author_work,dict_author__code_work_path, codes_for_008):
+        super(Bibliografie_record_ita, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, codes_for_008)
         self.italian_articles =  ['il', 'lo', 'la', 'gli', 'le', 'i', 'un', 'una', 'uno', 'dei', 'degli', 'delle']
         self.tag = 'it22'
     
@@ -33,7 +33,7 @@ class Bibliografie_record_ita(Bibliografie_record):
                 skip = str(2)
         if title[0:2].lower() == "un'":
                 skip = str(3) 
-        c = self.c_245(row, liability, author, translators, 'traduzione di ')  
+        c = self.c_245(row, liability, author, translators, '; traduzione di ')  
         title = title.strip()      
         if subtitle == '' and c == '':                                                                          
             record.add_ordered_field(Field(tag = '245', indicators = ['0', skip], subfields = [Subfield(code='a', value= title + "."), ]))                                                                          
@@ -58,7 +58,7 @@ class Bibliografie_record_ita(Bibliografie_record):
         " 001, 240, title, subtitle, liability -> 245"
         if not(pd.isnull(row['Původní název'])) and not (("originál neznámý" in str(row['Původní název']).lower())  or ("originál neexistuje" in str(row['Původní název']).lower())):
             original_title = row['Původní název'].strip()                                                                       
-            record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title),
+            record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title+'.'),
                                                                                         Subfield(code='l', value= 'italsky'), ])) 
         if not(pd.isnull(row['Zdroj či odkaz'])) and not (row['Zdroj či odkaz'] == ' '):
             record.add_ordered_field(Field(tag = '998', indicators=[' ', ' '], subfields=[Subfield(code='a', value= row['Zdroj či odkaz'].strip()),] ) )    
@@ -71,7 +71,7 @@ class Bibliografie_record_ita(Bibliografie_record):
         if not(pd.isnull(rel_original)) and rel_original != 'překlad':    
             type_ad = row['Druh adaptace (slovem)']
             record = self.add_787(record, rel_original, type_ad if not(pd.isnull(type_ad)) else None )
-            
+
         record.add_ordered_field(Field(tag = '500', indicators=[' ', ' '], subfields=[Subfield(code='a', value= "Záznam zpracován bez výtisku v ruce"), ]))
         return record 
     
@@ -201,6 +201,8 @@ if __name__ == "__main__":
     dict_author_work_path = "data/dict_author_work.obj"
 
     dict_author__code_work_path =  "data/dict_author_code_work.obj"
+
+    codes_for_008 = marc_extra_codes.save_genre_audience(path = 'data/work-database_archive.xlsx')
     # initial table 
     IN = 'data/preklady/Bibliografie_prekladu_ita.csv'
     # final file
@@ -219,7 +221,8 @@ if __name__ == "__main__":
             try:            
                 print(row['Číslo záznamu'])
                 bib_ita = Bibliografie_record_ita(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
-                                                    dict_author__code_work_path = dict_author__code_work_path)
+                                                    dict_author__code_work_path = dict_author__code_work_path,\
+                                                    codes_for_008 = codes_for_008 )
                 if 'kniha' in row['Typ záznamu']: 
                     record = bib_ita.create_record_book(row, df)
                 if 'část knihy' in row['Typ záznamu']: 

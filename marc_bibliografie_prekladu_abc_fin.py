@@ -8,8 +8,8 @@ import marc_extra_codes
 
 class Bibliografie_record_fin(Bibliografie_record): 
     
-    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path, fennica_path, clb_trl_path):
-        super(Bibliografie_record_fin, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path)
+    def __init__(self, finalauthority_path, dict_author_work, dict_author__code_work_path, codes_for_008, fennica_path, clb_trl_path):
+        super(Bibliografie_record_fin, self).__init__(finalauthority_path, dict_author_work, dict_author__code_work_path, codes_for_008)
         self.tag = "fi24"
         self.df_fennica = pickle.load(open(fennica_path, "rb" ))
         self.clb_trl = pickle.load(open(clb_trl_path, "rb" ))
@@ -133,7 +133,7 @@ class Bibliografie_record_fin(Bibliografie_record):
         
         if not(pd.isnull(row['Původní název'])) and not (("originál neznámý" in str(row['Původní název']).lower())  or ("originál neexistuje" in str(row['Původní název']).lower())):
             original_title = row['Původní název'].strip()                                                                       
-            record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title),
+            record.add_ordered_field(Field(tag='240', indicators = ['1', '0'], subfields = [Subfield(code='a', value= original_title+'.'),
                                                                                         Subfield(code='l', value= 'finsky'), ])) 
             
         title = row['Název díla dle titulu v latince'] if not pd.isnull(row['Název díla dle titulu v latince']) else ''
@@ -316,6 +316,8 @@ if __name__ == "__main__":
     # final file
     OUT = 'data/marc_fin.mrc'
 
+    codes_for_008 = marc_extra_codes.save_genre_audience(path = 'data/work-database_archive.xlsx')
+
     
     df = marc_extra_codes.load_df_csv(IN, 'fin')
     # table with authority codes
@@ -340,6 +342,7 @@ if __name__ == "__main__":
                 print(row['Číslo záznamu'])
                 bib_fin = Bibliografie_record_fin(finalauthority_path = finalauthority_path, dict_author_work= dict_author_work_path, \
                                                     dict_author__code_work_path =  dict_author__code_work_path, \
+                                                    codes_for_008 = codes_for_008, \
                                                     fennica_path="data/fennica_czech.obj", clb_trl_path="data/clb_trl_fin.obj")
                 title = row['Název díla dle titulu v latince']
                 (author_name,author_code), _  = bib_fin.add_author_code(row['Autor/ka + kód autority'], Record(to_unicode=True,
